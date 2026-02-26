@@ -5,25 +5,32 @@ import { existsSync } from "node:fs";
 import { socketPath, ensureSessionsDir } from "./paths";
 import { sendMessage } from "./client";
 
-const HELP = `usage: noninteractive <command> [args]
+const HELP = `noninteractive — run interactive CLI commands non-interactively.
+
+usage: npx noninteractive <command> [args]
 
 commands:
-  start <cmd> [args...]   start a session running <cmd>
-  read  <session>          read terminal output
-  send  <session> <text>   send keystrokes (empty string for Enter)
+  start <cmd> [args...]    start a session running <cmd>
+  read  <session>          read current terminal output
+  send  <session> <text>   send keystrokes (use "" for Enter)
   stop  <session>          stop a session
   list                     show active sessions
 
-examples:
-  npx noninteractive start npx vercel
-  npx noninteractive start vercel login
-  npx noninteractive read vercel
-  npx noninteractive send vercel ""
-  npx noninteractive send vercel "y"
-  npx noninteractive stop vercel
+the first argument to "start" is the command to run, NOT a session name.
+the session name is auto-derived from the command (e.g. "npx vercel" → session "vercel").
 
-session name is derived from the command automatically.
-use read/send/stop with that name to interact with the session.`;
+example workflow:
+  npx noninteractive start npx vercel       # starts "npx vercel", session name = "vercel"
+  npx noninteractive read vercel            # see what's on screen
+  npx noninteractive send vercel ""         # press Enter
+  npx noninteractive send vercel "y"        # type "y" and press Enter
+  npx noninteractive read vercel            # see updated output
+  npx noninteractive stop vercel            # done, stop the session
+
+more examples:
+  npx noninteractive start npx workos       # session "workos"
+  npx noninteractive start vercel login     # session "vercel"
+  npx noninteractive start npx supabase init  # session "supabase"`;
 
 function getSelfCommand(): string[] {
   if (process.argv[1] && /\.(ts|js)$/.test(process.argv[1])) {
@@ -54,8 +61,17 @@ async function start(cmdArgs: string[]) {
     const res = await sendMessage(sock, { action: "read" });
     if (res.ok) {
       process.stdout.write(res.output ?? "");
-      console.log(`\n[session '${name}' already running]`);
-      return;
+      if (res.exited) {
+        console.log(`\n[session '${name}' already exists but exited ${res.exitCode} — stopping it]`);
+        try { await sendMessage(sock, { action: "stop" }); } catch {}
+        // fall through to start a new session
+      } else {
+        console.log(`\n[session '${name}' already running — read the output above, then use:]`);
+        console.log(`  npx noninteractive send ${name} "<text>"   # send keystrokes (use "" for Enter)`);
+        console.log(`  npx noninteractive read ${name}             # read updated output`);
+        console.log(`  npx noninteractive stop ${name}             # stop the session`);
+        return;
+      }
     }
   } catch {}
 
@@ -76,7 +92,11 @@ async function start(cmdArgs: string[]) {
   }
 
   if (!existsSync(sock)) {
-    console.error("timeout: failed to start session");
+    console.error(`error: failed to start session '${name}'.`);
+    console.error(`the command was: ${executable} ${args.join(" ")}`);
+    console.error(`\nmake sure the command exists. examples:`);
+    console.error(`  npx noninteractive start npx vercel        # run an npx package`);
+    console.error(`  npx noninteractive start vercel login       # run a command directly`);
     process.exit(1);
   }
 
@@ -89,18 +109,34 @@ async function start(cmdArgs: string[]) {
       const clean = stripAnsi(res.output ?? "").trim();
       if (clean.length > 10) {
         process.stdout.write(res.output);
-        console.log(`\n[session '${name}' started]`);
+        if (res.exited) {
+          console.log(`\n[session '${name}' exited ${res.exitCode} — the command failed]`);
+          console.log(`hint: the first argument to "start" is the command to run, NOT a session name.`);
+          console.log(`  npx noninteractive start npx vercel        # run an npx package`);
+          console.log(`  npx noninteractive start vercel login       # run a command directly`);
+        } else {
+          console.log(`\n[session '${name}' started — read the output above, then use:]`);
+          console.log(`  npx noninteractive send ${name} "<text>"   # send keystrokes (use "" for Enter)`);
+          console.log(`  npx noninteractive read ${name}             # read updated output`);
+          console.log(`  npx noninteractive stop ${name}             # stop the session`);
+        }
         return;
       }
       if (res.exited) {
         process.stdout.write(res.output ?? "");
-        console.log(`\n[session '${name}' exited ${res.exitCode}]`);
+        console.log(`\n[session '${name}' exited ${res.exitCode} — the command failed]`);
+        console.log(`hint: the first argument to "start" is the command to run, NOT a session name.`);
+        console.log(`  npx noninteractive start npx vercel        # run an npx package`);
+        console.log(`  npx noninteractive start vercel login       # run a command directly`);
         return;
       }
     } catch {}
   }
 
-  console.log(`[session '${name}' started]`);
+  console.log(`[session '${name}' started but no output yet — use:]`);
+  console.log(`  npx noninteractive read ${name}             # read output`);
+  console.log(`  npx noninteractive send ${name} "<text>"   # send keystrokes (use "" for Enter)`);
+  console.log(`  npx noninteractive stop ${name}             # stop the session`);
 }
 
 async function read(name: string) {
@@ -113,6 +149,7 @@ async function read(name: string) {
 async function send(name: string, text: string) {
   const sock = socketPath(name);
   await sendMessage(sock, { action: "send", data: text });
+  console.log(`[sent to '${name}' — run "npx noninteractive read ${name}" to see the result]`);
 }
 
 async function stop(name: string) {
