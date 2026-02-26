@@ -7,11 +7,23 @@ import { sendMessage } from "./client";
 
 const HELP = `usage: noninteractive <command> [args]
 
-  start <name> [args...]   start a session (runs npx <name>)
-  read  <name>             read terminal output
-  send  <name> <text>      send keystrokes to session
-  stop  <name>             stop a session
-  list                     show active sessions`;
+commands:
+  start <cmd> [args...]   start a session running <cmd>
+  read  <session>          read terminal output
+  send  <session> <text>   send keystrokes (empty string for Enter)
+  stop  <session>          stop a session
+  list                     show active sessions
+
+examples:
+  npx noninteractive start npx vercel
+  npx noninteractive start vercel login
+  npx noninteractive read vercel
+  npx noninteractive send vercel ""
+  npx noninteractive send vercel "y"
+  npx noninteractive stop vercel
+
+session name is derived from the command automatically.
+use read/send/stop with that name to interact with the session.`;
 
 function getSelfCommand(): string[] {
   if (process.argv[1] && /\.(ts|js)$/.test(process.argv[1])) {
@@ -20,7 +32,22 @@ function getSelfCommand(): string[] {
   return [process.argv[0]];
 }
 
-async function start(name: string, args: string[]) {
+function deriveSessionName(cmd: string, args: string[]): string {
+  const parts = [cmd, ...args];
+  // skip npx/bunx prefix to get the real command name
+  let i = 0;
+  if (parts[i] === "npx" || parts[i] === "bunx") i++;
+  // skip flags like -y, --yes
+  while (i < parts.length && parts[i].startsWith("-")) i++;
+  const name = parts[i] || cmd;
+  // strip npm scope @foo/bar -> bar
+  return name.replace(/^@[^/]+\//, "").replace(/[^a-zA-Z0-9_-]/g, "");
+}
+
+async function start(cmdArgs: string[]) {
+  const executable = cmdArgs[0];
+  const args = cmdArgs.slice(1);
+  const name = deriveSessionName(executable, args);
   const sock = socketPath(name);
 
   try {
@@ -36,7 +63,7 @@ async function start(name: string, args: string[]) {
   try { const { unlinkSync } = await import("node:fs"); unlinkSync(sock); } catch {}
 
   const self = getSelfCommand();
-  const child = spawn(self[0], [...self.slice(1), "__daemon__", name, "npx", name, ...args], {
+  const child = spawn(self[0], [...self.slice(1), "__daemon__", name, executable, ...args], {
     detached: true,
     stdio: "ignore",
   });
@@ -74,9 +101,6 @@ async function start(name: string, args: string[]) {
   }
 
   console.log(`[session '${name}' started]`);
-
-  console.error("timeout: failed to start session");
-  process.exit(1);
 }
 
 async function read(name: string) {
@@ -132,24 +156,23 @@ async function main() {
 
   switch (cmd) {
     case "start": {
-      const name = args[1];
-      if (!name) { console.error("usage: noninteractive start <name> [args...]"); process.exit(1); }
-      return start(name, args.slice(2));
+      if (args.length < 2) { console.error("usage: noninteractive start <cmd> [args...]\n\nexample: npx noninteractive start npx vercel"); process.exit(1); }
+      return start(args.slice(1));
     }
     case "read": {
       const name = args[1];
-      if (!name) { console.error("usage: noninteractive read <name>"); process.exit(1); }
+      if (!name) { console.error("usage: noninteractive read <session>\n\nexample: npx noninteractive read vercel"); process.exit(1); }
       return read(name);
     }
     case "send": {
       const name = args[1];
       const text = args[2];
-      if (!name || text === undefined) { console.error("usage: noninteractive send <name> <text>"); process.exit(1); }
+      if (!name || text === undefined) { console.error("usage: noninteractive send <session> <text>\n\nexample: npx noninteractive send vercel \"y\""); process.exit(1); }
       return send(name, text);
     }
     case "stop": {
       const name = args[1];
-      if (!name) { console.error("usage: noninteractive stop <name>"); process.exit(1); }
+      if (!name) { console.error("usage: noninteractive stop <session>\n\nexample: npx noninteractive stop vercel"); process.exit(1); }
       return stop(name);
     }
     case "list":
