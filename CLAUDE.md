@@ -8,7 +8,8 @@ Session wrapper for interactive CLI commands. Lets claude code run interactive l
 - `src/daemon.ts` — detached daemon per session, spawns target command, unix socket server
 - `src/client.ts` — connects to daemon via unix socket, sends JSON commands
 - `src/paths.ts` — session dir/socket path helpers
-- `src/ptybridge.py` — python3 PTY bridge, allocates real terminal for child process
+- `ptybridge/main.go` — Go PTY bridge source, allocates real terminal for child process
+- `native/ptybridge-{os}-{arch}` — compiled Go PTY binaries (darwin-arm64, darwin-amd64, linux-amd64, linux-arm64)
 
 Sessions stored at `~/.noninteractive/sessions/<name>.sock`. Protocol is JSON over unix socket.
 
@@ -25,15 +26,17 @@ noninteractive list                     # show active sessions (alias: ls)
 ## Build
 
 ```
-bun run build    # compiles to bin/noninteractive standalone binary
+bun run build      # compiles to bin/noninteractive standalone binary
+bun run build:pty  # cross-compiles Go PTY bridge for all platforms
 ```
 
 ## Notes
 
 - daemon uses node:child_process and node:net (not Bun-specific APIs) for subprocess/socket — needed for detached spawn and unix socket server
-- PTY via python3 ptybridge.py — allocates a real pseudo-terminal so child processes see isTTY=true
-- compiled binary is ~55MB (includes bun runtime)
-- ptybridge.py must be co-located with the binary (or in src/ during dev)
+- PTY via Go binary (ptybridge/) using github.com/creack/pty — allocates a real pseudo-terminal so child processes see isTTY=true
+- Go binaries are ~2.5MB each, shipped for darwin/linux x arm64/amd64
+- no python3 dependency — everything is self-contained
+- compiled bun binary is ~55MB (includes bun runtime)
 
 ---
 

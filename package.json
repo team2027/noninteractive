@@ -1,13 +1,18 @@
 {
   "name": "noninteractive",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "type": "module",
   "bin": {
     "noninteractive": "./src/index.ts"
   },
+  "files": [
+    "src/**/*",
+    "native/**/*"
+  ],
   "scripts": {
     "dev": "bun run src/index.ts",
     "build": "bun build src/index.ts --compile --outfile bin/noninteractive",
+    "build:pty": "cd ptybridge && GOOS=darwin GOARCH=arm64 go build -o ../native/ptybridge-darwin-arm64 . && GOOS=darwin GOARCH=amd64 go build -o ../native/ptybridge-darwin-amd64 . && GOOS=linux GOARCH=amd64 go build -o ../native/ptybridge-linux-amd64 . && GOOS=linux GOARCH=arm64 go build -o ../native/ptybridge-linux-arm64 .",
     "test": "bun test"
   },
   "devDependencies": {

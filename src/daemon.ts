@@ -5,12 +5,14 @@ import { resolve, dirname } from "node:path";
 import { socketPath, ensureSessionsDir } from "./paths";
 
 function getPtyBridge(): string {
-  // when compiled, pty.py is bundled next to the binary
-  // in dev, it's in the same directory as this file
+  const platform = process.platform;
+  const arch = process.arch;
+  const binaryName = `ptybridge-${platform}-${arch}`;
+
   const candidates = [
-    resolve(dirname(process.argv[1] || process.execPath), "ptybridge.py"),
-    resolve(dirname(import.meta.dirname), "ptybridge.py"),
-    resolve(import.meta.dirname, "ptybridge.py"),
+    resolve(dirname(process.argv[1] || process.execPath), "native", binaryName),
+    resolve(dirname(import.meta.dirname), "native", binaryName),
+    resolve(import.meta.dirname, "..", "native", binaryName),
   ];
   for (const p of candidates) {
     try {
@@ -18,7 +20,7 @@ function getPtyBridge(): string {
       if (statSync(p).isFile()) return p;
     } catch {}
   }
-  return resolve(import.meta.dirname, "ptybridge.py");
+  return candidates[0];
 }
 
 export function runDaemon(sessionName: string, executable: string, args: string[]) {
@@ -32,7 +34,7 @@ export function runDaemon(sessionName: string, executable: string, args: string[
   let exitCode: number | null = null;
 
   const ptyBridge = getPtyBridge();
-  const proc = spawn("python3", [ptyBridge, executable, ...args], {
+  const proc = spawn(ptyBridge, [executable, ...args], {
     stdio: ["pipe", "pipe", "pipe"],
     env: { ...process.env, TERM: "xterm-256color" },
   });
