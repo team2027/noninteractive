@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """PTY bridge: spawns a command in a real PTY, pipes stdin/stdout."""
-import pty, os, sys, select, errno
+import pty, os, sys, select, fcntl, termios, struct
 
 master, slave = pty.openpty()
+
+# set terminal size so TUI libraries render correctly
+winsize = struct.pack("HHHH", 24, 80, 0, 0)
+fcntl.ioctl(slave, termios.TIOCSWINSZ, winsize)
 
 pid = os.fork()
 if pid == 0:
     os.close(master)
     os.setsid()
+    # make slave the controlling terminal
+    fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
     os.dup2(slave, 0)
     os.dup2(slave, 1)
     os.dup2(slave, 2)
@@ -19,8 +25,10 @@ os.close(slave)
 try:
     while True:
         fds = [master]
-        if not sys.stdin.closed:
+        try:
             fds.append(sys.stdin.fileno())
+        except ValueError:
+            pass
         r, _, _ = select.select(fds, [], [], 1.0)
         if sys.stdin.fileno() in r:
             data = os.read(sys.stdin.fileno(), 4096)
@@ -32,7 +40,6 @@ try:
             if not data:
                 break
             os.write(sys.stdout.fileno(), data)
-            sys.stdout.flush()
 except OSError:
     pass
 

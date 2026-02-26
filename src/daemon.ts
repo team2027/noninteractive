@@ -91,7 +91,7 @@ export function runDaemon(sessionName: string, executable: string, args: string[
           socket.end(JSON.stringify({ ok: false, error: "process exited" }));
           break;
         }
-        proc.stdin!.write(msg.data + "\n");
+        proc.stdin!.write(msg.data + "\r");
         socket.end(JSON.stringify({ ok: true }));
         break;
 
