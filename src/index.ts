@@ -42,18 +42,38 @@ async function start(name: string, args: string[]) {
   });
   child.unref();
 
+  // wait for socket to appear
   for (let i = 0; i < 50; i++) {
-    if (existsSync(sock)) {
-      await new Promise(r => setTimeout(r, 200));
-      try {
-        const res = await sendMessage(sock, { action: "read" });
-        if (res.output) process.stdout.write(res.output);
-      } catch {}
-      console.log(`[session '${name}' started]`);
-      return;
-    }
+    if (existsSync(sock)) break;
     await new Promise(r => setTimeout(r, 100));
   }
+
+  if (!existsSync(sock)) {
+    console.error("timeout: failed to start session");
+    process.exit(1);
+  }
+
+  // poll until we get meaningful output (up to 10s)
+  const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07/g, "");
+  for (let i = 0; i < 50; i++) {
+    await new Promise(r => setTimeout(r, 200));
+    try {
+      const res = await sendMessage(sock, { action: "read" });
+      const clean = stripAnsi(res.output ?? "").trim();
+      if (clean.length > 10) {
+        process.stdout.write(res.output);
+        console.log(`\n[session '${name}' started]`);
+        return;
+      }
+      if (res.exited) {
+        process.stdout.write(res.output ?? "");
+        console.log(`\n[session '${name}' exited ${res.exitCode}]`);
+        return;
+      }
+    } catch {}
+  }
+
+  console.log(`[session '${name}' started]`);
 
   console.error("timeout: failed to start session");
   process.exit(1);
