@@ -5,7 +5,7 @@ import { existsSync } from "node:fs";
 import { socketPath, ensureSessionsDir } from "./paths";
 import { sendMessage } from "./client";
 
-const HELP = `usage: 2027 <command> [args]
+const HELP = `usage: noninteractive <command> [args]
 
   start <name> [args...]   start a session (runs npx <name>)
   read  <name>             read terminal output
@@ -113,23 +113,23 @@ async function main() {
   switch (cmd) {
     case "start": {
       const name = args[1];
-      if (!name) { console.error("usage: 2027 start <name> [args...]"); process.exit(1); }
+      if (!name) { console.error("usage: noninteractive start <name> [args...]"); process.exit(1); }
       return start(name, args.slice(2));
     }
     case "read": {
       const name = args[1];
-      if (!name) { console.error("usage: 2027 read <name>"); process.exit(1); }
+      if (!name) { console.error("usage: noninteractive read <name>"); process.exit(1); }
       return read(name);
     }
     case "send": {
       const name = args[1];
       const text = args[2];
-      if (!name || text === undefined) { console.error("usage: 2027 send <name> <text>"); process.exit(1); }
+      if (!name || text === undefined) { console.error("usage: noninteractive send <name> <text>"); process.exit(1); }
       return send(name, text);
     }
     case "stop": {
       const name = args[1];
-      if (!name) { console.error("usage: 2027 stop <name>"); process.exit(1); }
+      if (!name) { console.error("usage: noninteractive stop <name>"); process.exit(1); }
       return stop(name);
     }
     case "list":

@@ -1,13 +1,13 @@
 {
-  "name": "2027",
+  "name": "noninteractive",
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "2027": "./src/index.ts"
+    "noninteractive": "./src/index.ts"
   },
   "scripts": {
     "dev": "bun run src/index.ts",
-    "build": "bun build src/index.ts --compile --outfile bin/2027",
+    "build": "bun build src/index.ts --compile --outfile bin/noninteractive",
     "test": "bun test"
   },
   "devDependencies": {

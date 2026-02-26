@@ -1,4 +1,4 @@
-# 2027 CLI
+# noninteractive CLI
 
 Session wrapper for interactive CLI commands. Lets claude code run interactive login flows non-interactively.
 
@@ -10,22 +10,22 @@ Session wrapper for interactive CLI commands. Lets claude code run interactive l
 - `src/paths.ts` — session dir/socket path helpers
 - `src/ptybridge.py` — python3 PTY bridge, allocates real terminal for child process
 
-Sessions stored at `~/.2027/sessions/<name>.sock`. Protocol is JSON over unix socket.
+Sessions stored at `~/.noninteractive/sessions/<name>.sock`. Protocol is JSON over unix socket.
 
 ## Commands
 
 ```
-2027 start <name> [args...]   # start session (runs npx <name> in a PTY)
-2027 read  <name>             # read terminal output
-2027 send  <name> <text>      # send keystrokes to session
-2027 stop  <name>             # stop a session
-2027 list                     # show active sessions (alias: ls)
+noninteractive start <name> [args...]   # start session (runs npx <name> in a PTY)
+noninteractive read  <name>             # read terminal output
+noninteractive send  <name> <text>      # send keystrokes to session
+noninteractive stop  <name>             # stop a session
+noninteractive list                     # show active sessions (alias: ls)
 ```
 
 ## Build
 
 ```
-bun run build    # compiles to bin/2027 standalone binary
+bun run build    # compiles to bin/noninteractive standalone binary
 ```
 
 ## Notes

@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { mkdirSync } from "node:fs";
 
-export const SESSIONS_DIR = resolve(process.env.HOME!, ".2027", "sessions");
+export const SESSIONS_DIR = resolve(process.env.HOME!, ".noninteractive", "sessions");
 
 export function ensureSessionsDir() {
   mkdirSync(SESSIONS_DIR, { recursive: true });
