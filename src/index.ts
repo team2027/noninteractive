@@ -215,6 +215,13 @@ async function main() {
     case "list":
     case "ls":
       return list();
+    case "version":
+    case "--version":
+    case "-v": {
+      const { version } = require("../package.json");
+      console.log(`noninteractive v${version}`);
+      return;
+    }
     default:
       console.log(HELP);
   }
