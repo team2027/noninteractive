@@ -5,6 +5,14 @@ import { existsSync } from "node:fs";
 import { socketPath, ensureSessionsDir } from "./paths";
 import { sendMessage } from "./client";
 
+const HELP = `usage: 2027 <command> [args]
+
+  start <name> [args...]   start a session (runs npx <name>)
+  read  <name>             read terminal output
+  send  <name> <text>      send keystrokes to session
+  stop  <name>             stop a session
+  list                     show active sessions`;
+
 function getSelfCommand(): string[] {
   if (process.argv[1] && /\.(ts|js)$/.test(process.argv[1])) {
     return [process.argv[0], process.argv[1]];
@@ -12,54 +20,14 @@ function getSelfCommand(): string[] {
   return [process.argv[0]];
 }
 
-function parseArgs() {
-  const args = process.argv.slice(2);
-
-  if (args[0] === "__daemon__") {
-    // __daemon__ <session-name> <executable> [args...]
-    return { mode: "daemon" as const, sessionName: args[1], executable: args[2], commandArgs: args.slice(3) };
-  }
-
-  if (args.length === 0 || args[0] === "--help") {
-    return { mode: "help" as const };
-  }
-
-  if (args[0] === "--list") {
-    return { mode: "list" as const };
-  }
-
-  const command = args[0];
-  const rest = args.slice(1);
-
-  let action: "start" | "input" | "read" | "kill" = "start";
-  let input: string | undefined;
-  const commandArgs: string[] = [];
-
-  for (let i = 0; i < rest.length; i++) {
-    if (rest[i] === "--input" && i + 1 < rest.length) {
-      action = "input";
-      input = rest[i + 1];
-      i++;
-    } else if (rest[i] === "--read") {
-      action = "read";
-    } else if (rest[i] === "--kill") {
-      action = "kill";
-    } else {
-      commandArgs.push(rest[i]);
-    }
-  }
-
-  return { mode: action, command, commandArgs, input };
-}
-
-async function start(command: string, commandArgs: string[]) {
-  const sock = socketPath(command);
+async function start(name: string, args: string[]) {
+  const sock = socketPath(name);
 
   try {
     const res = await sendMessage(sock, { action: "read" });
     if (res.ok) {
       process.stdout.write(res.output ?? "");
-      console.log(`\n[session '${command}' already running]`);
+      console.log(`\n[session '${name}' already running]`);
       return;
     }
   } catch {}
@@ -68,7 +36,7 @@ async function start(command: string, commandArgs: string[]) {
   try { const { unlinkSync } = await import("node:fs"); unlinkSync(sock); } catch {}
 
   const self = getSelfCommand();
-  const child = spawn(self[0], [...self.slice(1), "__daemon__", command, "npx", command, ...commandArgs], {
+  const child = spawn(self[0], [...self.slice(1), "__daemon__", name, "npx", name, ...args], {
     detached: true,
     stdio: "ignore",
   });
@@ -81,7 +49,7 @@ async function start(command: string, commandArgs: string[]) {
         const res = await sendMessage(sock, { action: "read" });
         if (res.output) process.stdout.write(res.output);
       } catch {}
-      console.log(`[session '${command}' started]`);
+      console.log(`[session '${name}' started]`);
       return;
     }
     await new Promise(r => setTimeout(r, 100));
@@ -89,6 +57,24 @@ async function start(command: string, commandArgs: string[]) {
 
   console.error("timeout: failed to start session");
   process.exit(1);
+}
+
+async function read(name: string) {
+  const sock = socketPath(name);
+  const res = await sendMessage(sock, { action: "read" });
+  if (res.output !== undefined) process.stdout.write(res.output);
+  if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
+}
+
+async function send(name: string, text: string) {
+  const sock = socketPath(name);
+  await sendMessage(sock, { action: "send", data: text });
+}
+
+async function stop(name: string) {
+  const sock = socketPath(name);
+  await sendMessage(sock, { action: "stop" });
+  console.log(`session '${name}' stopped`);
 }
 
 async function list() {
@@ -115,45 +101,42 @@ async function list() {
 }
 
 async function main() {
-  const parsed = parseArgs();
+  const args = process.argv.slice(2);
 
-  if (parsed.mode === "daemon") {
+  if (args[0] === "__daemon__") {
     const { runDaemon } = await import("./daemon");
-    return runDaemon(parsed.sessionName!, parsed.executable!, parsed.commandArgs!);
+    return runDaemon(args[1], args[2], args.slice(3));
   }
 
-  if (parsed.mode === "help") {
-    console.log(`usage: 2027 <command> [args...] [--input <text>] [--read] [--kill]
-       2027 --list`);
-    return;
-  }
+  const cmd = args[0];
 
-  if (parsed.mode === "list") {
-    return list();
-  }
-
-  const { command, commandArgs = [], input } = parsed as any;
-  const sock = socketPath(command);
-
-  switch (parsed.mode) {
-    case "start":
-      return start(command, commandArgs);
-
-    case "input":
-      await sendMessage(sock, { action: "input", data: input });
-      break;
-
-    case "read": {
-      const res = await sendMessage(sock, { action: "read" });
-      if (res.output !== undefined) process.stdout.write(res.output);
-      if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
-      break;
+  switch (cmd) {
+    case "start": {
+      const name = args[1];
+      if (!name) { console.error("usage: 2027 start <name> [args...]"); process.exit(1); }
+      return start(name, args.slice(2));
     }
-
-    case "kill":
-      await sendMessage(sock, { action: "kill" });
-      console.log(`session '${command}' killed`);
-      break;
+    case "read": {
+      const name = args[1];
+      if (!name) { console.error("usage: 2027 read <name>"); process.exit(1); }
+      return read(name);
+    }
+    case "send": {
+      const name = args[1];
+      const text = args[2];
+      if (!name || text === undefined) { console.error("usage: 2027 send <name> <text>"); process.exit(1); }
+      return send(name, text);
+    }
+    case "stop": {
+      const name = args[1];
+      if (!name) { console.error("usage: 2027 stop <name>"); process.exit(1); }
+      return stop(name);
+    }
+    case "list":
+    case "ls":
+      return list();
+    default:
+      console.log(HELP);
   }
 }
 

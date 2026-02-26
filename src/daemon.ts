@@ -1,7 +1,25 @@
 import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 import { unlinkSync } from "node:fs";
+import { resolve, dirname } from "node:path";
 import { socketPath, ensureSessionsDir } from "./paths";
+
+function getPtyBridge(): string {
+  // when compiled, pty.py is bundled next to the binary
+  // in dev, it's in the same directory as this file
+  const candidates = [
+    resolve(dirname(process.argv[1] || process.execPath), "ptybridge.py"),
+    resolve(dirname(import.meta.dirname), "ptybridge.py"),
+    resolve(import.meta.dirname, "ptybridge.py"),
+  ];
+  for (const p of candidates) {
+    try {
+      const { statSync } = require("node:fs");
+      if (statSync(p).isFile()) return p;
+    } catch {}
+  }
+  return resolve(import.meta.dirname, "ptybridge.py");
+}
 
 export function runDaemon(sessionName: string, executable: string, args: string[]) {
   ensureSessionsDir();
@@ -13,9 +31,10 @@ export function runDaemon(sessionName: string, executable: string, args: string[
   let processExited = false;
   let exitCode: number | null = null;
 
-  const proc = spawn(executable, args, {
+  const ptyBridge = getPtyBridge();
+  const proc = spawn("python3", [ptyBridge, executable, ...args], {
     stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, FORCE_COLOR: "0" },
+    env: { ...process.env, TERM: "xterm-256color" },
   });
 
   proc.stdout!.on("data", (chunk: Buffer) => {
@@ -67,7 +86,7 @@ export function runDaemon(sessionName: string, executable: string, args: string[
         }));
         break;
 
-      case "input":
+      case "send":
         if (processExited) {
           socket.end(JSON.stringify({ ok: false, error: "process exited" }));
           break;
@@ -76,7 +95,7 @@ export function runDaemon(sessionName: string, executable: string, args: string[
         socket.end(JSON.stringify({ ok: true }));
         break;
 
-      case "kill":
+      case "stop":
         proc.kill("SIGTERM");
         socket.end(JSON.stringify({ ok: true }));
         setTimeout(() => {

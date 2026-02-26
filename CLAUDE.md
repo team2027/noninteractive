@@ -1,3 +1,41 @@
+# 2027 CLI
+
+Session wrapper for interactive CLI commands. Lets claude code run interactive login flows non-interactively.
+
+## Architecture
+
+- `src/index.ts` — CLI entry point, arg parsing, auto-start flow
+- `src/daemon.ts` — detached daemon per session, spawns target command, unix socket server
+- `src/client.ts` — connects to daemon via unix socket, sends JSON commands
+- `src/paths.ts` — session dir/socket path helpers
+- `src/ptybridge.py` — python3 PTY bridge, allocates real terminal for child process
+
+Sessions stored at `~/.2027/sessions/<name>.sock`. Protocol is JSON over unix socket.
+
+## Commands
+
+```
+2027 start <name> [args...]   # start session (runs npx <name> in a PTY)
+2027 read  <name>             # read terminal output
+2027 send  <name> <text>      # send keystrokes to session
+2027 stop  <name>             # stop a session
+2027 list                     # show active sessions (alias: ls)
+```
+
+## Build
+
+```
+bun run build    # compiles to bin/2027 standalone binary
+```
+
+## Notes
+
+- daemon uses node:child_process and node:net (not Bun-specific APIs) for subprocess/socket — needed for detached spawn and unix socket server
+- PTY via python3 ptybridge.py — allocates a real pseudo-terminal so child processes see isTTY=true
+- compiled binary is ~55MB (includes bun runtime)
+- ptybridge.py must be co-located with the binary (or in src/ during dev)
+
+---
 
 Default to using Bun instead of Node.js.
 
