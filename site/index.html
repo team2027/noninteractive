@@ -21,16 +21,20 @@
     }
 
     :root {
-      --black: #000000;
-      --cream: #f5f0e8;
-      --cream-dim: #a8a49c;
-      --cream-dark: #3d3b37;
+      --bg: #fafaf8;
+      --fg: #1a1a18;
+      --dim: #6b6966;
+      --border: #e0ddd8;
+      --surface: #f0eee9;
+      --terminal-bg: #1a1a18;
+      --terminal-fg: #e8e4dc;
+      --terminal-dim: #8a8680;
     }
 
     body {
       font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
-      background: var(--black);
-      color: var(--cream);
+      background: var(--bg);
+      color: var(--fg);
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
       position: relative;
@@ -45,66 +49,9 @@
       width: 100%;
       height: 100%;
       pointer-events: none;
-      opacity: 0.03;
+      opacity: 0.02;
       z-index: 1000;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 1024 1024' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-    }
-
-    /* Perspective grid */
-    body::after {
-      content: '';
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 60%;
-      pointer-events: none;
-      z-index: -1;
-      background:
-        linear-gradient(to top, rgba(245, 240, 232, 0.03) 0%, transparent 100%),
-        linear-gradient(to top,
-          transparent 0%,
-          transparent 50%,
-          rgba(0,0,0,0.8) 100%
-        );
-      mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, transparent 100%);
-      -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, transparent 100%);
-    }
-
-    .grid-bg {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: -2;
-      overflow: hidden;
-    }
-
-    .grid-bg::before {
-      content: '';
-      position: absolute;
-      bottom: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background-image:
-        linear-gradient(rgba(245, 240, 232, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(245, 240, 232, 0.03) 1px, transparent 1px);
-      background-size: 60px 60px;
-      transform: perspective(500px) rotateX(60deg);
-      transform-origin: center top;
-    }
-
-    .grid-bg::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: radial-gradient(ellipse at 50% 0%, rgba(245, 240, 232, 0.05) 0%, transparent 60%);
     }
 
     .container {
@@ -121,9 +68,10 @@
       right: 0;
       z-index: 100;
       padding: 20px 0;
-      background: rgba(0, 0, 0, 0.95);
+      background: rgba(250, 250, 248, 0.95);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
     }
 
     nav .container {
@@ -136,7 +84,7 @@
       font-family: 'JetBrains Mono', monospace;
       font-size: 15px;
       font-weight: 500;
-      color: var(--cream);
+      color: var(--fg);
       text-decoration: none;
       letter-spacing: -0.02em;
     }
@@ -149,13 +97,13 @@
 
     .nav-links a {
       font-size: 14px;
-      color: var(--cream-dim);
+      color: var(--dim);
       text-decoration: none;
       transition: color 0.2s;
     }
 
     .nav-links a:hover {
-      color: var(--cream);
+      color: var(--fg);
     }
 
     /* Hero */
@@ -180,8 +128,8 @@
       font-size: 12px;
       font-weight: 500;
       letter-spacing: 0.05em;
-      color: var(--cream-dim);
-      border: 1px solid var(--cream-dark);
+      color: var(--dim);
+      border: 1px solid var(--border);
       border-radius: 100px;
       padding: 6px 16px;
       margin-bottom: 32px;
@@ -197,7 +145,7 @@
 
     .hero .subtitle {
       font-size: 22px;
-      color: var(--cream-dim);
+      color: var(--dim);
       margin-bottom: 48px;
       max-width: 520px;
     }
@@ -218,28 +166,28 @@
       font-family: 'JetBrains Mono', monospace;
       font-size: 15px;
       padding: 14px 24px;
-      background: rgba(245, 240, 232, 0.04);
-      border: 1px solid var(--cream-dark);
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 6px;
-      color: var(--cream);
+      color: var(--fg);
       cursor: pointer;
       transition: all 0.2s;
       user-select: all;
     }
 
     .install-cmd:hover {
-      border-color: var(--cream-dim);
-      background: rgba(245, 240, 232, 0.06);
+      border-color: var(--dim);
+      background: #eae8e3;
     }
 
     .install-cmd .prompt {
-      color: var(--cream-dim);
+      color: var(--dim);
       user-select: none;
     }
 
     .install-cmd .copy-hint {
       font-size: 11px;
-      color: var(--cream-dim);
+      color: var(--dim);
       opacity: 0;
       transition: opacity 0.2s;
       user-select: none;
@@ -257,16 +205,16 @@
       font-size: 15px;
       font-weight: 500;
       font-family: inherit;
-      color: var(--cream-dim);
+      color: var(--dim);
       text-decoration: none;
-      border: 1px solid var(--cream-dark);
+      border: 1px solid var(--border);
       border-radius: 6px;
       transition: all 0.2s;
     }
 
     .github-link:hover {
-      color: var(--cream);
-      border-color: var(--cream-dim);
+      color: var(--fg);
+      border-color: var(--dim);
     }
 
     /* Terminal demo */
@@ -275,10 +223,11 @@
     }
 
     .terminal {
-      background: rgba(245, 240, 232, 0.02);
-      border: 1px solid var(--cream-dark);
+      background: var(--terminal-bg);
+      border: 1px solid #2a2a28;
       border-radius: 12px;
       overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
     }
 
     .terminal-bar {
@@ -286,20 +235,21 @@
       align-items: center;
       gap: 8px;
       padding: 14px 20px;
-      border-bottom: 1px solid var(--cream-dark);
+      border-bottom: 1px solid #2a2a28;
+      background: #141413;
     }
 
     .terminal-dot {
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background: var(--cream-dark);
+      background: #3d3b37;
     }
 
     .terminal-title {
       font-family: 'JetBrains Mono', monospace;
       font-size: 12px;
-      color: var(--cream-dim);
+      color: var(--terminal-dim);
       margin-left: 8px;
     }
 
@@ -318,16 +268,16 @@
     }
 
     .terminal-body .cmd {
-      color: var(--cream);
+      color: var(--terminal-fg);
     }
 
     .terminal-body .cmd::before {
       content: '$ ';
-      color: var(--cream-dim);
+      color: var(--terminal-dim);
     }
 
     .terminal-body .output {
-      color: var(--cream-dim);
+      color: var(--terminal-dim);
     }
 
     .terminal-body .comment {
@@ -339,7 +289,7 @@
     }
 
     .terminal-body .highlight {
-      color: var(--cream);
+      color: var(--terminal-fg);
     }
 
     @keyframes terminal-line {
@@ -373,7 +323,7 @@
     /* How it works */
     .how-it-works {
       padding: 100px 0;
-      border-top: 1px solid var(--cream-dark);
+      border-top: 1px solid var(--border);
     }
 
     .section-label {
@@ -381,7 +331,7 @@
       font-weight: 500;
       letter-spacing: 0.15em;
       text-transform: uppercase;
-      color: var(--cream-dim);
+      color: var(--dim);
       margin-bottom: 48px;
     }
 
@@ -402,13 +352,13 @@
       font-family: 'JetBrains Mono', monospace;
       font-size: 13px;
       font-weight: 500;
-      color: var(--cream-dim);
+      color: var(--dim);
       width: 40px;
       height: 40px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid var(--cream-dark);
+      border: 1px solid var(--border);
       border-radius: 8px;
       flex-shrink: 0;
     }
@@ -421,14 +371,14 @@
 
     .step p {
       font-size: 15px;
-      color: var(--cream-dim);
+      color: var(--dim);
       line-height: 1.6;
     }
 
     .step code {
       font-family: 'JetBrains Mono', monospace;
       font-size: 13px;
-      background: rgba(245, 240, 232, 0.04);
+      background: var(--surface);
       padding: 2px 6px;
       border-radius: 4px;
     }
@@ -436,7 +386,7 @@
     /* Features */
     .features {
       padding: 100px 0;
-      border-top: 1px solid var(--cream-dark);
+      border-top: 1px solid var(--border);
     }
 
     .features-grid {
@@ -449,15 +399,15 @@
       display: flex;
       flex-direction: column;
       padding: 32px;
-      background: rgba(245, 240, 232, 0.02);
-      border: 1px solid var(--cream-dark);
+      background: var(--bg);
+      border: 1px solid var(--border);
       border-radius: 12px;
       transition: all 0.2s;
     }
 
     .feature-card:hover {
-      border-color: var(--cream-dim);
-      background: rgba(245, 240, 232, 0.04);
+      border-color: var(--dim);
+      background: var(--surface);
     }
 
     .feature-card h3 {
@@ -468,14 +418,14 @@
 
     .feature-card p {
       font-size: 15px;
-      color: var(--cream-dim);
+      color: var(--dim);
       line-height: 1.6;
     }
 
     /* Commands */
     .commands {
       padding: 100px 0;
-      border-top: 1px solid var(--cream-dark);
+      border-top: 1px solid var(--border);
     }
 
     .commands h2 {
@@ -492,7 +442,7 @@
     }
 
     .cmd-table tr {
-      border-bottom: 1px solid var(--cream-dark);
+      border-bottom: 1px solid var(--border);
     }
 
     .cmd-table tr:last-child {
@@ -507,7 +457,7 @@
     .cmd-table td:first-child {
       font-family: 'JetBrains Mono', monospace;
       font-size: 13px;
-      color: var(--cream);
+      color: var(--fg);
       white-space: nowrap;
       padding-right: 32px;
       width: 1%;
@@ -515,13 +465,13 @@
 
     .cmd-table td:last-child {
       font-size: 15px;
-      color: var(--cream-dim);
+      color: var(--dim);
     }
 
     /* Why section */
     .why {
       padding: 100px 0;
-      border-top: 1px solid var(--cream-dark);
+      border-top: 1px solid var(--border);
     }
 
     .why h2 {
@@ -534,7 +484,7 @@
 
     .why p {
       font-size: 16px;
-      color: var(--cream-dim);
+      color: var(--dim);
       margin-bottom: 24px;
     }
 
@@ -546,7 +496,7 @@
     /* Footer */
     footer {
       padding: 48px 0;
-      border-top: 1px solid var(--cream-dark);
+      border-top: 1px solid var(--border);
     }
 
     .footer-content {
@@ -557,17 +507,17 @@
 
     footer p {
       font-size: 13px;
-      color: var(--cream-dim);
+      color: var(--dim);
     }
 
     footer a {
-      color: var(--cream-dim);
+      color: var(--dim);
       text-decoration: none;
       transition: color 0.2s;
     }
 
     footer a:hover {
-      color: var(--cream);
+      color: var(--fg);
     }
 
     .social-links {
@@ -576,12 +526,12 @@
     }
 
     .social-links a {
-      color: var(--cream-dim);
+      color: var(--dim);
       transition: color 0.2s;
     }
 
     .social-links a:hover {
-      color: var(--cream);
+      color: var(--fg);
     }
 
     /* Mobile */
@@ -647,8 +597,6 @@
   </style>
 </head>
 <body>
-  <div class="grid-bg"></div>
-
   <nav>
     <div class="container">
       <a href="/" class="nav-logo">noninteractive</a>
