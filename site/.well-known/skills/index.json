@@ -1,0 +1,9 @@
+{
+  "skills": [
+    {
+      "name": "noninteractive",
+      "description": "Run interactive CLI commands (setup wizards, login flows, installers) non-interactively using npx noninteractive. Use when you need to run a CLI tool that has interactive prompts, OAuth flows, or terminal-based menus that cannot be bypassed with flags.",
+      "files": ["SKILL.md"]
+    }
+  ]
+}
