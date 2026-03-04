@@ -13,9 +13,11 @@
     "dev": "bun run src/index.ts",
     "build": "bun build src/index.ts --compile --outfile bin/noninteractive",
     "build:pty": "cd ptybridge && GOOS=darwin GOARCH=arm64 go build -o ../native/ptybridge-darwin-arm64 . && GOOS=darwin GOARCH=amd64 go build -o ../native/ptybridge-darwin-amd64 . && GOOS=linux GOARCH=amd64 go build -o ../native/ptybridge-linux-amd64 . && GOOS=linux GOARCH=arm64 go build -o ../native/ptybridge-linux-arm64 .",
+    "check": "biome check --write src/",
     "test": "bun test"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.5",
     "@types/bun": "latest"
   },
   "peerDependencies": {

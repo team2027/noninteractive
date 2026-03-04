@@ -2,8 +2,8 @@
 
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { socketPath, ensureSessionsDir } from "./paths";
 import { sendMessage } from "./client";
+import { ensureSessionsDir, socketPath } from "./paths";
 
 const HELP = `noninteractive — run interactive CLI commands non-interactively.
 
@@ -33,208 +33,284 @@ more examples:
   npx noninteractive start vercel login     # explicit start for non-npx commands`;
 
 function getSelfCommand(): string[] {
-  if (process.argv[1] && /\.(ts|js)$/.test(process.argv[1])) {
-    return [process.argv[0], process.argv[1]];
-  }
-  return [process.argv[0]];
+	if (process.argv[1] && /\.(ts|js)$/.test(process.argv[1])) {
+		return [process.argv[0], process.argv[1]];
+	}
+	return [process.argv[0]];
 }
 
 function deriveSessionName(cmd: string, args: string[]): string {
-  const parts = [cmd, ...args];
-  // skip npx/bunx prefix to get the real command name
-  let i = 0;
-  if (parts[i] === "npx" || parts[i] === "bunx") i++;
-  // skip flags like -y, --yes
-  while (i < parts.length && parts[i].startsWith("-")) i++;
-  const name = parts[i] || cmd;
-  // strip npm scope @foo/bar -> bar
-  return name.replace(/^@[^/]+\//, "").replace(/[^a-zA-Z0-9_-]/g, "");
+	const parts = [cmd, ...args];
+	// skip npx/bunx prefix to get the real command name
+	let i = 0;
+	if (parts[i] === "npx" || parts[i] === "bunx") i++;
+	// skip flags like -y, --yes
+	while (i < parts.length && parts[i].startsWith("-")) i++;
+	const name = parts[i] || cmd;
+	// strip npm scope @foo/bar -> bar
+	return name.replace(/^@[^/]+\//, "").replace(/[^a-zA-Z0-9_-]/g, "");
 }
 
 async function start(cmdArgs: string[]) {
-  const executable = cmdArgs[0];
-  const args = cmdArgs.slice(1);
-  const name = deriveSessionName(executable, args);
-  const sock = socketPath(name);
+	const executable = cmdArgs[0];
+	const args = cmdArgs.slice(1);
+	const name = deriveSessionName(executable, args);
+	const sock = socketPath(name);
 
-  try {
-    const res = await sendMessage(sock, { action: "read" });
-    if (res.ok) {
-      process.stdout.write(res.output ?? "");
-      if (res.exited) {
-        console.log(`\n[session '${name}' already exists but exited ${res.exitCode} — stopping it]`);
-        try { await sendMessage(sock, { action: "stop" }); } catch {}
-        // fall through to start a new session
-      } else {
-        console.log(`\n[session '${name}' already running — read the output above, then use:]`);
-        console.log(`  npx noninteractive send ${name} "<text>"   # send keystrokes (use "" for Enter)`);
-        console.log(`  npx noninteractive read ${name}             # read updated output`);
-        console.log(`  npx noninteractive stop ${name}             # stop the session`);
-        return;
-      }
-    }
-  } catch {}
+	try {
+		const res = await sendMessage(sock, { action: "read" });
+		if (res.ok) {
+			process.stdout.write(res.output ?? "");
+			if (res.exited) {
+				console.log(
+					`\n[session '${name}' already exists but exited ${res.exitCode} — stopping it]`,
+				);
+				try {
+					await sendMessage(sock, { action: "stop" });
+				} catch {}
+				// fall through to start a new session
+			} else {
+				console.log(
+					`\n[session '${name}' already running — read the output above, then use:]`,
+				);
+				console.log(
+					`  npx noninteractive send ${name} "<text>"   # send keystrokes (use "" for Enter)`,
+				);
+				console.log(
+					`  npx noninteractive read ${name}             # read updated output`,
+				);
+				console.log(
+					`  npx noninteractive stop ${name}             # stop the session`,
+				);
+				return;
+			}
+		}
+	} catch {}
 
-  ensureSessionsDir();
-  try { const { unlinkSync } = await import("node:fs"); unlinkSync(sock); } catch {}
+	ensureSessionsDir();
+	try {
+		const { unlinkSync } = await import("node:fs");
+		unlinkSync(sock);
+	} catch {}
 
-  const self = getSelfCommand();
-  const child = spawn(self[0], [...self.slice(1), "__daemon__", name, executable, ...args], {
-    detached: true,
-    stdio: "ignore",
-  });
-  child.unref();
+	const self = getSelfCommand();
+	const child = spawn(
+		self[0],
+		[...self.slice(1), "__daemon__", name, executable, ...args],
+		{
+			detached: true,
+			stdio: "ignore",
+		},
+	);
+	child.unref();
 
-  // wait for socket to appear
-  for (let i = 0; i < 50; i++) {
-    if (existsSync(sock)) break;
-    await new Promise(r => setTimeout(r, 100));
-  }
+	// wait for socket to appear
+	for (let i = 0; i < 50; i++) {
+		if (existsSync(sock)) break;
+		await new Promise((r) => setTimeout(r, 100));
+	}
 
-  if (!existsSync(sock)) {
-    console.error(`error: failed to start session '${name}'.`);
-    console.error(`the command was: ${executable} ${args.join(" ")}`);
-    console.error(`\nmake sure the command exists. examples:`);
-    console.error(`  npx noninteractive start npx vercel        # run an npx package`);
-    console.error(`  npx noninteractive start vercel login       # run a command directly`);
-    process.exit(1);
-  }
+	if (!existsSync(sock)) {
+		console.error(`error: failed to start session '${name}'.`);
+		console.error(`the command was: ${executable} ${args.join(" ")}`);
+		console.error(`\nmake sure the command exists. examples:`);
+		console.error(
+			`  npx noninteractive start npx vercel        # run an npx package`,
+		);
+		console.error(
+			`  npx noninteractive start vercel login       # run a command directly`,
+		);
+		process.exit(1);
+	}
 
-  // poll until we get meaningful output (up to 10s)
-  const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07/g, "");
-  for (let i = 0; i < 50; i++) {
-    await new Promise(r => setTimeout(r, 200));
-    try {
-      const res = await sendMessage(sock, { action: "read" });
-      const clean = stripAnsi(res.output ?? "").trim();
-      if (clean.length > 10) {
-        process.stdout.write(res.output);
-        if (res.exited) {
-          console.log(`\n[session '${name}' exited ${res.exitCode} — the command failed]`);
-          console.log(`hint: the first argument to "start" is the command to run, NOT a session name.`);
-          console.log(`  npx noninteractive start npx vercel        # run an npx package`);
-          console.log(`  npx noninteractive start vercel login       # run a command directly`);
-        } else {
-          console.log(`\n[session '${name}' started — read the output above, then use:]`);
-          console.log(`  npx noninteractive send ${name} "<text>"   # send keystrokes (use "" for Enter)`);
-          console.log(`  npx noninteractive read ${name}             # read updated output`);
-          console.log(`  npx noninteractive stop ${name}             # stop the session`);
-        }
-        return;
-      }
-      if (res.exited) {
-        process.stdout.write(res.output ?? "");
-        console.log(`\n[session '${name}' exited ${res.exitCode} — the command failed]`);
-        console.log(`hint: the first argument to "start" is the command to run, NOT a session name.`);
-        console.log(`  npx noninteractive start npx vercel        # run an npx package`);
-        console.log(`  npx noninteractive start vercel login       # run a command directly`);
-        return;
-      }
-    } catch {}
-  }
+	// poll until we get meaningful output (up to 10s)
+	const stripAnsi = (s: string) =>
+		s.replace(/\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07/g, "");
+	for (let i = 0; i < 50; i++) {
+		await new Promise((r) => setTimeout(r, 200));
+		try {
+			const res = await sendMessage(sock, { action: "read" });
+			const clean = stripAnsi(res.output ?? "").trim();
+			if (clean.length > 10) {
+				process.stdout.write(res.output);
+				if (res.exited) {
+					console.log(
+						`\n[session '${name}' exited ${res.exitCode} — the command failed]`,
+					);
+					console.log(
+						`hint: the first argument to "start" is the command to run, NOT a session name.`,
+					);
+					console.log(
+						`  npx noninteractive start npx vercel        # run an npx package`,
+					);
+					console.log(
+						`  npx noninteractive start vercel login       # run a command directly`,
+					);
+				} else {
+					console.log(
+						`\n[session '${name}' started — read the output above, then use:]`,
+					);
+					console.log(
+						`  npx noninteractive send ${name} "<text>"   # send keystrokes (use "" for Enter)`,
+					);
+					console.log(
+						`  npx noninteractive read ${name}             # read updated output`,
+					);
+					console.log(
+						`  npx noninteractive stop ${name}             # stop the session`,
+					);
+				}
+				return;
+			}
+			if (res.exited) {
+				process.stdout.write(res.output ?? "");
+				console.log(
+					`\n[session '${name}' exited ${res.exitCode} — the command failed]`,
+				);
+				console.log(
+					`hint: the first argument to "start" is the command to run, NOT a session name.`,
+				);
+				console.log(
+					`  npx noninteractive start npx vercel        # run an npx package`,
+				);
+				console.log(
+					`  npx noninteractive start vercel login       # run a command directly`,
+				);
+				return;
+			}
+		} catch {}
+	}
 
-  console.log(`[session '${name}' started but no output yet — use:]`);
-  console.log(`  npx noninteractive read ${name}             # read output`);
-  console.log(`  npx noninteractive send ${name} "<text>"   # send keystrokes (use "" for Enter)`);
-  console.log(`  npx noninteractive stop ${name}             # stop the session`);
+	console.log(`[session '${name}' started but no output yet — use:]`);
+	console.log(`  npx noninteractive read ${name}             # read output`);
+	console.log(
+		`  npx noninteractive send ${name} "<text>"   # send keystrokes (use "" for Enter)`,
+	);
+	console.log(
+		`  npx noninteractive stop ${name}             # stop the session`,
+	);
 }
 
 async function read(name: string) {
-  const sock = socketPath(name);
-  const res = await sendMessage(sock, { action: "read" });
-  if (res.output !== undefined) process.stdout.write(res.output);
-  if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
+	const sock = socketPath(name);
+	const res = await sendMessage(sock, { action: "read" });
+	if (res.output !== undefined) process.stdout.write(res.output);
+	if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
 }
 
 async function send(name: string, text: string) {
-  const sock = socketPath(name);
-  await sendMessage(sock, { action: "send", data: text });
-  console.log(`[sent to '${name}' — run "npx noninteractive read ${name}" to see the result]`);
+	const sock = socketPath(name);
+	await sendMessage(sock, { action: "send", data: text });
+	console.log(
+		`[sent to '${name}' — run "npx noninteractive read ${name}" to see the result]`,
+	);
 }
 
 async function stop(name: string) {
-  const sock = socketPath(name);
-  await sendMessage(sock, { action: "stop" });
-  console.log(`session '${name}' stopped`);
+	const sock = socketPath(name);
+	await sendMessage(sock, { action: "stop" });
+	console.log(`session '${name}' stopped`);
 }
 
 async function list() {
-  const { readdirSync } = await import("node:fs");
-  ensureSessionsDir();
-  const files = readdirSync((await import("./paths")).SESSIONS_DIR);
-  const sessions = files.filter(f => f.endsWith(".sock")).map(f => f.replace(".sock", ""));
+	const { readdirSync } = await import("node:fs");
+	ensureSessionsDir();
+	const files = readdirSync((await import("./paths")).SESSIONS_DIR);
+	const sessions = files
+		.filter((f) => f.endsWith(".sock"))
+		.map((f) => f.replace(".sock", ""));
 
-  if (sessions.length === 0) {
-    console.log("no active sessions");
-    return;
-  }
+	if (sessions.length === 0) {
+		console.log("no active sessions");
+		return;
+	}
 
-  for (const name of sessions) {
-    const sock = socketPath(name);
-    try {
-      const res = await sendMessage(sock, { action: "status" });
-      const status = res.running ? "running" : `exited (${res.exitCode})`;
-      console.log(`${name} [${status}] pid=${res.pid}`);
-    } catch {
-      console.log(`${name} [dead]`);
-    }
-  }
+	for (const name of sessions) {
+		const sock = socketPath(name);
+		try {
+			const res = await sendMessage(sock, { action: "status" });
+			const status = res.running ? "running" : `exited (${res.exitCode})`;
+			console.log(`${name} [${status}] pid=${res.pid}`);
+		} catch {
+			console.log(`${name} [dead]`);
+		}
+	}
 }
 
 async function main() {
-  const args = process.argv.slice(2);
+	const args = process.argv.slice(2);
 
-  if (args[0] === "__daemon__") {
-    const { runDaemon } = await import("./daemon");
-    return runDaemon(args[1], args[2], args.slice(3));
-  }
+	if (args[0] === "__daemon__") {
+		const { runDaemon } = await import("./daemon");
+		return runDaemon(args[1], args[2], args.slice(3));
+	}
 
-  const cmd = args[0];
+	const cmd = args[0];
 
-  switch (cmd) {
-    case "start": {
-      if (args.length < 2) { console.error("usage: noninteractive start <cmd> [args...]\n\nexample: npx noninteractive start npx vercel"); process.exit(1); }
-      return start(args.slice(1));
-    }
-    case "read": {
-      const name = args[1];
-      if (!name) { console.error("usage: noninteractive read <session>\n\nexample: npx noninteractive read vercel"); process.exit(1); }
-      return read(name);
-    }
-    case "send": {
-      const name = args[1];
-      const text = args[2];
-      if (!name || text === undefined) { console.error("usage: noninteractive send <session> <text>\n\nexample: npx noninteractive send vercel \"y\""); process.exit(1); }
-      return send(name, text);
-    }
-    case "stop": {
-      const name = args[1];
-      if (!name) { console.error("usage: noninteractive stop <session>\n\nexample: npx noninteractive stop vercel"); process.exit(1); }
-      return stop(name);
-    }
-    case "list":
-    case "ls":
-      return list();
-    case "version":
-    case "--version":
-    case "-v": {
-      const { version } = require("../package.json");
-      console.log(`noninteractive v${version}`);
-      return;
-    }
-    case undefined:
-    case "help":
-    case "--help":
-    case "-h":
-      console.log(HELP);
-      break;
-    default:
-      // treat unknown commands as: start npx <args>
-      return start(["npx", ...args]);
-  }
+	switch (cmd) {
+		case "start": {
+			if (args.length < 2) {
+				console.error(
+					"usage: noninteractive start <cmd> [args...]\n\nexample: npx noninteractive start npx vercel",
+				);
+				process.exit(1);
+			}
+			return start(args.slice(1));
+		}
+		case "read": {
+			const name = args[1];
+			if (!name) {
+				console.error(
+					"usage: noninteractive read <session>\n\nexample: npx noninteractive read vercel",
+				);
+				process.exit(1);
+			}
+			return read(name);
+		}
+		case "send": {
+			const name = args[1];
+			const text = args[2];
+			if (!name || text === undefined) {
+				console.error(
+					'usage: noninteractive send <session> <text>\n\nexample: npx noninteractive send vercel "y"',
+				);
+				process.exit(1);
+			}
+			return send(name, text);
+		}
+		case "stop": {
+			const name = args[1];
+			if (!name) {
+				console.error(
+					"usage: noninteractive stop <session>\n\nexample: npx noninteractive stop vercel",
+				);
+				process.exit(1);
+			}
+			return stop(name);
+		}
+		case "list":
+		case "ls":
+			return list();
+		case "version":
+		case "--version":
+		case "-v": {
+			const { version } = require("../package.json");
+			console.log(`noninteractive v${version}`);
+			return;
+		}
+		case undefined:
+		case "help":
+		case "--help":
+		case "-h":
+			console.log(HELP);
+			break;
+		default:
+			// treat unknown commands as: start npx <args>
+			return start(["npx", ...args]);
+	}
 }
 
 main().catch((err) => {
-  console.error(err.message);
-  process.exit(1);
+	console.error(err.message);
+	process.exit(1);
 });
