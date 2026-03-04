@@ -4,7 +4,7 @@ description: Run interactive CLI commands (setup wizards, login flows, installer
 compatibility: Requires Node.js 18+ or Bun. Works on macOS and Linux (x86_64, arm64).
 metadata:
   author: 2027dev
-  version: "1.0"
+  version: "1.1"
 ---
 
 # noninteractive
@@ -26,11 +26,11 @@ Do NOT use noninteractive when:
 ## Commands
 
 ```
-npx noninteractive start <cmd> [args...]   # Start a session
-npx noninteractive read  <session>         # Read terminal output
+npx noninteractive <tool> [args...]    # Start a session (runs npx <tool>)
+npx noninteractive read  <session>     # Read terminal output
 npx noninteractive send  <session> <text>  # Send keystrokes
-npx noninteractive stop  <session>         # Stop session
-npx noninteractive list                    # Show active sessions
+npx noninteractive stop  <session>     # Stop session
+npx noninteractive list                # Show active sessions
 ```
 
 ## Step-by-step workflow
@@ -38,15 +38,15 @@ npx noninteractive list                    # Show active sessions
 ### 1. Start a session
 
 ```bash
-npx noninteractive start npx <tool-name>
+npx noninteractive <tool-name>
 ```
 
-The first argument after `start` is the command to run. The session name is auto-derived from the command (e.g., `npx vercel` becomes session `vercel`, `npx workos` becomes `workos`).
+This runs `npx <tool-name>` in a background PTY. The session name is the tool name (e.g., `npx noninteractive workos` → session `workos`).
 
 You can also pass arguments:
 ```bash
-npx noninteractive start npx workos login
-npx noninteractive start npx vercel deploy
+npx noninteractive workos login
+npx noninteractive vercel deploy
 ```
 
 ### 2. Read terminal output
@@ -97,7 +97,7 @@ npx noninteractive stop <session>
 
 ```bash
 # Start the WorkOS installer
-npx noninteractive start npx workos
+npx noninteractive workos
 
 # Read what's on screen
 npx noninteractive read workos
@@ -126,7 +126,7 @@ npx noninteractive stop workos
 
 ## Important details
 
-- **Session names**: Auto-derived from the command. `npx vercel` → `vercel`, `npx workos` → `workos`. The `npx`/`bunx` prefix and flags like `-y` are stripped.
+- **Session names**: Auto-derived from the tool name. `workos` → session `workos`, `vercel` → session `vercel`.
 - **Output accumulates**: `read` returns ALL output since the session started, not just new output. You may need to look at the end of the output for the latest prompt.
 - **Send always appends Enter**: Every `send` adds a carriage return. To just press Enter, send an empty string `""`.
 - **Sessions persist**: Sessions run as background daemons. They survive even if your process exits. Use `list` to see active sessions.
@@ -147,7 +147,7 @@ If the CLI prints a URL to open for authentication:
 ### Multiple sessions
 You can run multiple sessions simultaneously:
 ```bash
-npx noninteractive start npx vercel
-npx noninteractive start npx workos
+npx noninteractive vercel
+npx noninteractive workos
 npx noninteractive list  # Shows both sessions
 ```

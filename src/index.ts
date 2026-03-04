@@ -7,30 +7,30 @@ import { sendMessage } from "./client";
 
 const HELP = `noninteractive — run interactive CLI commands non-interactively.
 
-usage: npx noninteractive <command> [args]
+usage: npx noninteractive <tool> [args...]
 
 commands:
-  start <cmd> [args...]    start a session running <cmd>
+  <tool> [args...]         start a session (runs npx <tool> in a PTY)
   read  <session>          read current terminal output
   send  <session> <text>   send keystrokes (use "" for Enter)
   stop  <session>          stop a session
   list                     show active sessions
+  start <cmd> [args...]    explicit start (for non-npx commands)
 
-the first argument to "start" is the command to run, NOT a session name.
-the session name is auto-derived from the command (e.g. "npx vercel" → session "vercel").
+the session name is auto-derived from the tool (e.g. "workos" → session "workos").
 
 example workflow:
-  npx noninteractive start npx vercel       # starts "npx vercel", session name = "vercel"
-  npx noninteractive read vercel            # see what's on screen
-  npx noninteractive send vercel ""         # press Enter
-  npx noninteractive send vercel "y"        # type "y" and press Enter
-  npx noninteractive read vercel            # see updated output
-  npx noninteractive stop vercel            # done, stop the session
+  npx noninteractive workos                 # starts "npx workos", session = "workos"
+  npx noninteractive read workos            # see what's on screen
+  npx noninteractive send workos ""         # press Enter
+  npx noninteractive send workos "y"        # type "y" and press Enter
+  npx noninteractive read workos            # see updated output
+  npx noninteractive stop workos            # done, stop the session
 
 more examples:
-  npx noninteractive start npx workos       # session "workos"
-  npx noninteractive start vercel login     # session "vercel"
-  npx noninteractive start npx supabase init  # session "supabase"`;
+  npx noninteractive vercel                 # session "vercel"
+  npx noninteractive supabase init          # session "supabase"
+  npx noninteractive start vercel login     # explicit start for non-npx commands`;
 
 function getSelfCommand(): string[] {
   if (process.argv[1] && /\.(ts|js)$/.test(process.argv[1])) {
@@ -222,8 +222,15 @@ async function main() {
       console.log(`noninteractive v${version}`);
       return;
     }
-    default:
+    case undefined:
+    case "help":
+    case "--help":
+    case "-h":
       console.log(HELP);
+      break;
+    default:
+      // treat unknown commands as: start npx <args>
+      return start(["npx", ...args]);
   }
 }
 
