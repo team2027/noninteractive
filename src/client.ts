@@ -1,9 +1,19 @@
 import { createConnection } from "node:net";
 
+export interface DaemonResponse {
+	ok: boolean;
+	output?: string;
+	exited?: boolean;
+	exitCode?: number | null;
+	running?: boolean;
+	pid?: number;
+	error?: string;
+}
+
 export function sendMessage(
 	sockPath: string,
 	msg: Record<string, unknown>,
-): Promise<any> {
+): Promise<DaemonResponse> {
 	return new Promise((resolve, reject) => {
 		const socket = createConnection(sockPath);
 		let data = "";

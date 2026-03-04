@@ -1,8 +1,13 @@
 import { spawn } from "node:child_process";
 import { unlinkSync } from "node:fs";
-import { createServer } from "node:net";
+import { createServer, type Socket } from "node:net";
 import { dirname, resolve } from "node:path";
 import { ensureSessionsDir, socketPath } from "./paths";
+
+interface DaemonMessage {
+	action: "read" | "send" | "stop" | "status";
+	data?: string;
+}
 
 function getPtyBridge(): string {
 	const platform = process.platform;
@@ -45,11 +50,13 @@ export function runDaemon(
 		env: { ...process.env, TERM: "xterm-256color" },
 	});
 
-	proc.stdout!.on("data", (chunk: Buffer) => {
+	const { stdout, stderr, stdin } = proc;
+
+	stdout?.on("data", (chunk: Buffer) => {
 		outputBuffer += chunk.toString();
 	});
 
-	proc.stderr!.on("data", (chunk: Buffer) => {
+	stderr?.on("data", (chunk: Buffer) => {
 		outputBuffer += chunk.toString();
 	});
 
@@ -85,7 +92,7 @@ export function runDaemon(
 		});
 	});
 
-	function handle(msg: any, socket: any) {
+	function handle(msg: DaemonMessage, socket: Socket) {
 		switch (msg.action) {
 			case "read":
 				socket.end(
@@ -103,7 +110,7 @@ export function runDaemon(
 					socket.end(JSON.stringify({ ok: false, error: "process exited" }));
 					break;
 				}
-				proc.stdin!.write(msg.data + "\r");
+				stdin?.write(`${msg.data}\r`);
 				socket.end(JSON.stringify({ ok: true }));
 				break;
 
