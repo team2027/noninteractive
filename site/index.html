@@ -646,7 +646,7 @@
         </div>
         <div class="terminal-body">
           <div class="line comment"># start the WorkOS installer in a background PTY</div>
-          <div class="line cmd">npx noninteractive start workos</div>
+          <div class="line cmd">npx noninteractive workos</div>
           <div class="line spacer"></div>
           <div class="line comment"># read what's on screen</div>
           <div class="line cmd">npx noninteractive read workos</div>
@@ -675,7 +675,7 @@
           <div class="step-num">1</div>
           <div>
             <h3>Spawn in a real PTY</h3>
-            <p><code>start</code> launches a detached daemon that runs your command inside a real pseudo-terminal. The child process sees <code>isTTY=true</code> — ANSI colors, select menus, and raw terminal mode all work.</p>
+            <p>Just prefix your command with <code>noninteractive</code>. It launches a detached daemon that runs it inside a real pseudo-terminal. The child process sees <code>isTTY=true</code> — ANSI colors, select menus, and raw terminal mode all work.</p>
           </div>
         </div>
         <div class="step">
@@ -722,27 +722,23 @@
 
   <section class="commands">
     <div class="container">
-      <h2>Five commands. That's it.</h2>
+      <h2>Four commands. That's it.</h2>
       <table class="cmd-table">
         <tr>
-          <td>start &lt;name&gt;</td>
-          <td>Start a session — runs <code>npx &lt;name&gt;</code> in a background PTY</td>
+          <td>&lt;tool&gt; [args]</td>
+          <td>Start a session — runs <code>npx &lt;tool&gt;</code> in a background PTY</td>
         </tr>
         <tr>
-          <td>read &lt;name&gt;</td>
+          <td>read &lt;session&gt;</td>
           <td>Read the current terminal output</td>
         </tr>
         <tr>
-          <td>send &lt;name&gt; &lt;text&gt;</td>
+          <td>send &lt;session&gt; &lt;text&gt;</td>
           <td>Send keystrokes to the session</td>
         </tr>
         <tr>
-          <td>stop &lt;name&gt;</td>
+          <td>stop &lt;session&gt;</td>
           <td>Stop a running session</td>
-        </tr>
-        <tr>
-          <td>list</td>
-          <td>Show all active sessions</td>
         </tr>
       </table>
     </div>
@@ -784,14 +780,14 @@
           <div style="margin-bottom: 4px;">without a human. It spawns commands in a real PTY and</div>
           <div style="margin-bottom: 12px;">lets you read output and send keystrokes programmatically.</div>
           <div style="color: var(--terminal-fg); margin-bottom: 8px;">## Step-by-step workflow</div>
-          <div style="margin-bottom: 2px;">1. <span style="color: var(--terminal-fg);">npx noninteractive start npx &lt;tool&gt;</span></div>
+          <div style="margin-bottom: 2px;">1. <span style="color: var(--terminal-fg);">npx noninteractive &lt;tool&gt;</span></div>
           <div style="margin-bottom: 2px;">2. <span style="color: var(--terminal-fg);">npx noninteractive read &lt;session&gt;</span></div>
           <div style="margin-bottom: 2px;">3. <span style="color: var(--terminal-fg);">npx noninteractive send &lt;session&gt; "input"</span></div>
           <div>4. Repeat until done</div>
         </div>
       </div>
       <div class="cta-row" style="justify-content: flex-start;">
-        <a href="https://github.com/team2027/cli/blob/main/SKILL.md" class="github-link" target="_blank">
+        <a href="https://github.com/team2027/cli/blob/main/site/.well-known/skills/noninteractive/SKILL.md" class="github-link" target="_blank">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
           View SKILL.md
         </a>
