@@ -14,7 +14,7 @@ npx noninteractive
 
 ```bash
 # Start a session (runs `npx workos` in a background PTY)
-npx noninteractive start workos
+npx noninteractive workos
 
 # Read what's on screen
 npx noninteractive read workos
@@ -36,7 +36,7 @@ npx noninteractive list
 
 ```bash
 # Start the installer
-npx noninteractive start workos
+npx noninteractive workos
 
 # Wait for it to load, then read the prompt
 npx noninteractive read workos
@@ -62,9 +62,17 @@ npx noninteractive send workos ""
 npx noninteractive stop workos
 ```
 
+## Agent Skill
+
+Install the [Agent Skill](https://agentskills.io) so your AI agent knows how to use noninteractive:
+
+```bash
+npx skills add https://noninteractive.org
+```
+
 ## How it works
 
-1. `start` spawns a detached daemon process that runs the target command inside a real pseudo-terminal (PTY)
+1. `npx noninteractive <tool>` spawns a detached daemon that runs `npx <tool>` inside a real pseudo-terminal (PTY)
 2. The daemon listens on a unix socket at `~/.noninteractive/sessions/<name>.sock`
 3. `read`, `send`, and `stop` connect to that socket to interact with the running process
 4. The PTY ensures the child process sees a real terminal — `isTTY` is true, ANSI colors work, interactive menus render correctly
