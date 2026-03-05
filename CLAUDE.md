@@ -16,12 +16,14 @@ Sessions stored at `~/.noninteractive/sessions/<name>.sock`. Protocol is JSON ov
 ## Commands
 
 ```
-noninteractive start <name> [args...]   # start session (runs npx <name> in a PTY)
-noninteractive read  <name>             # read terminal output
-noninteractive send  <name> <text>      # send keystrokes to session
-noninteractive stop  <name>             # stop a session
-noninteractive list                     # show active sessions (alias: ls)
+noninteractive start <name> [args...]          # start session (runs npx <name> in a PTY)
+noninteractive send  <name> <text> [--wait]    # send keystrokes (--wait blocks for new output)
+noninteractive read  <name> [--wait]           # read terminal output (--wait blocks for new output)
+noninteractive stop  <name>                    # stop a session
+noninteractive list                            # show active sessions (alias: ls)
 ```
+
+The `--wait` flag on `send` and `read` blocks until new output appears (default 30s timeout, configurable with `--timeout <ms>`). The daemon-side action for `send --wait` is `sendread`.
 
 ## Build
 

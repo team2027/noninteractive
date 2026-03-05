@@ -4,7 +4,7 @@ description: Run interactive CLI commands (setup wizards, login flows, installer
 compatibility: Requires Node.js 18+ or Bun. Works on macOS and Linux (x86_64, arm64).
 metadata:
   author: 2027dev
-  version: "1.1"
+  version: "1.2"
 ---
 
 # noninteractive
@@ -26,14 +26,16 @@ Do NOT use noninteractive when:
 ## Commands
 
 ```
-npx noninteractive <tool> [args...]    # Start a session (runs npx <tool>)
-npx noninteractive read  <session>     # Read terminal output
-npx noninteractive send  <session> <text>  # Send keystrokes
-npx noninteractive stop  <session>     # Stop session
-npx noninteractive list                # Show active sessions
+npx noninteractive <tool> [args...]                  # Start a session (runs npx <tool>)
+npx noninteractive send <session> <text> [--wait]    # Send keystrokes (--wait for response)
+npx noninteractive read <session> [--wait]           # Read terminal output (--wait blocks)
+npx noninteractive stop <session>                    # Stop session
+npx noninteractive list                              # Show active sessions
 ```
 
 ## Step-by-step workflow
+
+**Always use `--wait` flag** on `send` and `read` to avoid polling. This blocks until new output appears, saving tool calls and tokens.
 
 ### 1. Start a session
 
@@ -41,53 +43,38 @@ npx noninteractive list                # Show active sessions
 npx noninteractive <tool-name>
 ```
 
-This runs `npx <tool-name>` in a background PTY. The session name is the tool name (e.g., `npx noninteractive workos` → session `workos`).
+This runs `npx <tool-name>` in a background PTY. The session name is the tool name (e.g., `npx noninteractive workos` → session `workos`). The start command already reads and prints initial output.
 
-You can also pass arguments:
-```bash
-npx noninteractive workos login
-npx noninteractive vercel deploy
-```
-
-### 2. Read terminal output
+### 2. Send input and wait for response
 
 ```bash
-npx noninteractive read <session>
+# Press Enter (confirm/select current option) and wait for next prompt
+npx noninteractive send <session> "" --wait
+
+# Type text and press Enter, wait for response
+npx noninteractive send <session> "my-project-name" --wait
+
+# Type 'y' to confirm, wait for response
+npx noninteractive send <session> "y" --wait
 ```
 
-This returns the full terminal output. Read it to understand what the CLI is asking for. Look for:
-- Selection menus (use arrow keys or enter)
-- Yes/No prompts
-- Text input fields
-- URLs to open (for OAuth flows)
-
-### 3. Send input
-
-```bash
-# Press Enter (confirm/select current option)
-npx noninteractive send <session> ""
-
-# Type text and press Enter
-npx noninteractive send <session> "my-project-name"
-
-# Type 'y' to confirm
-npx noninteractive send <session> "y"
-```
+`send --wait` sends the keystrokes, then blocks until new output appears. This replaces the old pattern of `send` + polling `read` in a loop.
 
 Every `send` appends a carriage return (Enter key) after the text. Sending `""` (empty string) is equivalent to pressing Enter.
 
-### 4. Read again after sending
+### 3. Wait for output without sending (OAuth flows, long operations)
 
-Always read output after sending input to see the result:
 ```bash
-npx noninteractive read <session>
+npx noninteractive read <session> --wait
 ```
 
-### 5. Repeat until done
+Use `read --wait` when you need to wait for output without sending input — for example, waiting for an OAuth callback to complete or a long operation to finish.
 
-Continue the read → decide → send loop until the CLI flow is complete.
+### 4. Repeat until done
 
-### 6. Stop the session
+Continue the send → wait cycle until the CLI flow is complete.
+
+### 5. Stop the session
 
 ```bash
 npx noninteractive stop <session>
@@ -96,29 +83,23 @@ npx noninteractive stop <session>
 ## Complete example: WorkOS CLI setup
 
 ```bash
-# Start the WorkOS installer
+# Start the WorkOS installer (prints initial output)
 npx noninteractive workos
-
-# Read what's on screen
-npx noninteractive read workos
 # Output: ◆  Run the AuthKit installer?
 #         │  ● Yes / ○ No
 #         └
 
-# Press Enter to select "Yes"
-npx noninteractive send workos ""
-
-# Read next prompt
-npx noninteractive read workos
+# Press Enter to select "Yes", wait for next prompt
+npx noninteractive send workos "" --wait
 # Output: ◆  You are on main. Create a feature branch?
 #         │  ● Create feat/add-workos-authkit
 #         └
 
-# Press Enter to confirm
-npx noninteractive send workos ""
+# Press Enter to confirm, wait for response
+npx noninteractive send workos "" --wait
 
-# Continue reading and responding...
-npx noninteractive read workos
+# Continue sending and waiting...
+npx noninteractive send workos "my-api-key" --wait
 
 # When done, stop the session
 npx noninteractive stop workos
@@ -127,11 +108,12 @@ npx noninteractive stop workos
 ## Important details
 
 - **Session names**: Auto-derived from the tool name. `workos` → session `workos`, `vercel` → session `vercel`.
-- **Output accumulates**: `read` returns ALL output since the session started, not just new output. You may need to look at the end of the output for the latest prompt.
+- **Output accumulates**: `read` returns ALL output since the session started, not just new output. Look at the end for the latest prompt.
 - **Send always appends Enter**: Every `send` adds a carriage return. To just press Enter, send an empty string `""`.
+- **Use --wait**: Always prefer `send --wait` over separate `send` + `read` calls. It's faster and uses fewer tool calls.
 - **Sessions persist**: Sessions run as background daemons. They survive even if your process exits. Use `list` to see active sessions.
 - **Real PTY**: The child process sees `isTTY=true`. Terminal menus, colors, and raw mode all work correctly.
-- **Wait between send and read**: After sending input, wait a moment before reading to give the CLI time to process and render the next prompt. A 1-2 second pause is usually sufficient.
+- **Timeout**: `--wait` defaults to 30s timeout. Use `--timeout <ms>` to change it.
 
 ## Handling common patterns
 
@@ -142,7 +124,7 @@ For CLI menus that require arrow keys, you may need to send arrow key escape seq
 If the CLI prints a URL to open for authentication:
 1. Read the output to find the URL
 2. Tell the user to open the URL and complete authentication
-3. Continue reading output — the CLI will usually detect the completed auth and proceed
+3. Use `read --wait` to block until the CLI detects the completed auth and proceeds
 
 ### Multiple sessions
 You can run multiple sessions simultaneously:
