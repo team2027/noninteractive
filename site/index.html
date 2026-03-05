@@ -647,21 +647,18 @@
         <div class="terminal-body">
           <div class="line comment"># start the WorkOS installer in a background PTY</div>
           <div class="line cmd">npx noninteractive workos</div>
-          <div class="line spacer"></div>
-          <div class="line comment"># read what's on screen</div>
-          <div class="line cmd">npx noninteractive read workos</div>
           <div class="line output">◆  Run the AuthKit installer?</div>
           <div class="line output">│  <span class="highlight">● Yes</span> / ○ No</div>
           <div class="line output">└</div>
           <div class="line spacer"></div>
-          <div class="line comment"># send Enter to confirm</div>
-          <div class="line cmd">npx noninteractive send workos ""</div>
-          <div class="line spacer"></div>
-          <div class="line comment"># read the next prompt</div>
-          <div class="line cmd">npx noninteractive read workos</div>
+          <div class="line comment"># send Enter to confirm, wait for next prompt</div>
+          <div class="line cmd">npx noninteractive send workos "" --wait</div>
           <div class="line output">◆  You are on main. Create a feature branch?</div>
           <div class="line output">│  <span class="highlight">● Create feat/add-workos-authkit</span></div>
           <div class="line output">└</div>
+          <div class="line spacer"></div>
+          <div class="line comment"># send Enter again, wait for response</div>
+          <div class="line cmd">npx noninteractive send workos "" --wait</div>
         </div>
       </div>
     </div>
@@ -688,8 +685,8 @@
         <div class="step">
           <div class="step-num">3</div>
           <div>
-            <h3>Read, decide, send</h3>
-            <p>The agent reads terminal output, decides what to type, and sends keystrokes. It completes the entire interactive flow autonomously — no human needed.</p>
+            <h3>Send, wait, repeat</h3>
+            <p>The agent sends keystrokes with <code>--wait</code> and blocks until new output appears. No polling loops — one call per interaction. It completes the entire flow autonomously.</p>
           </div>
         </div>
       </div>
@@ -729,12 +726,12 @@
           <td>Start a session — runs <code>npx &lt;tool&gt;</code> in a background PTY</td>
         </tr>
         <tr>
-          <td>read &lt;session&gt;</td>
-          <td>Read the current terminal output</td>
+          <td>send &lt;session&gt; &lt;text&gt; --wait</td>
+          <td>Send keystrokes and wait for new output — one call instead of polling</td>
         </tr>
         <tr>
-          <td>send &lt;session&gt; &lt;text&gt;</td>
-          <td>Send keystrokes to the session</td>
+          <td>read &lt;session&gt; --wait</td>
+          <td>Block until new output appears (for OAuth flows, long operations)</td>
         </tr>
         <tr>
           <td>stop &lt;session&gt;</td>
@@ -786,8 +783,8 @@
           <div style="margin-bottom: 12px;">lets you read output and send keystrokes programmatically.</div>
           <div style="color: var(--terminal-fg); margin-bottom: 8px;">## Step-by-step workflow</div>
           <div style="margin-bottom: 2px;">1. <span style="color: var(--terminal-fg);">npx noninteractive &lt;tool&gt;</span></div>
-          <div style="margin-bottom: 2px;">2. <span style="color: var(--terminal-fg);">npx noninteractive read &lt;session&gt;</span></div>
-          <div style="margin-bottom: 2px;">3. <span style="color: var(--terminal-fg);">npx noninteractive send &lt;session&gt; "input"</span></div>
+          <div style="margin-bottom: 2px;">2. <span style="color: var(--terminal-fg);">npx noninteractive send &lt;session&gt; "input" --wait</span></div>
+          <div style="margin-bottom: 2px;">3. <span style="color: var(--terminal-fg);">npx noninteractive read &lt;session&gt; --wait</span></div>
           <div>4. Repeat until done</div>
         </div>
       </div>

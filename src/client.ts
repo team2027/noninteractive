@@ -13,10 +13,26 @@ export interface DaemonResponse {
 export function sendMessage(
 	sockPath: string,
 	msg: Record<string, unknown>,
+	timeoutMs?: number,
 ): Promise<DaemonResponse> {
+	const effectiveTimeout = timeoutMs ?? 5000;
 	return new Promise((resolve, reject) => {
 		const socket = createConnection(sockPath);
 		let data = "";
+		let resolved = false;
+
+		let timer: ReturnType<typeof setTimeout>;
+
+		function tryResolve() {
+			if (resolved) return;
+			try {
+				const parsed = JSON.parse(data);
+				resolved = true;
+				clearTimeout(timer);
+				socket.destroy();
+				resolve(parsed);
+			} catch {}
+		}
 
 		socket.on("connect", () => {
 			socket.write(JSON.stringify(msg));
@@ -24,17 +40,22 @@ export function sendMessage(
 
 		socket.on("data", (chunk) => {
 			data += chunk.toString();
+			tryResolve();
 		});
 
 		socket.on("end", () => {
-			try {
-				resolve(JSON.parse(data));
-			} catch {
+			tryResolve();
+			if (!resolved) {
+				resolved = true;
+				clearTimeout(timer);
 				reject(new Error("invalid response from daemon"));
 			}
 		});
 
 		socket.on("error", (err: NodeJS.ErrnoException) => {
+			if (resolved) return;
+			resolved = true;
+			clearTimeout(timer);
 			if (err.code === "ECONNREFUSED" || err.code === "ENOENT") {
 				reject(new Error("session not found"));
 			} else {
@@ -42,9 +63,11 @@ export function sendMessage(
 			}
 		});
 
-		setTimeout(() => {
+		timer = setTimeout(() => {
+			if (resolved) return;
+			resolved = true;
 			socket.destroy();
 			reject(new Error("connection timeout"));
-		}, 5000);
+		}, effectiveTimeout);
 	});
 }

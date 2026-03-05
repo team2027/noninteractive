@@ -10,22 +10,25 @@ const HELP = `noninteractive — run interactive CLI commands non-interactively.
 usage: npx noninteractive <tool> [args...]
 
 commands:
-  <tool> [args...]         start a session (runs npx <tool> in a PTY)
-  read  <session>          read current terminal output
-  send  <session> <text>   send keystrokes (use "" for Enter)
-  stop  <session>          stop a session
-  list                     show active sessions
-  start <cmd> [args...]    explicit start (for non-npx commands)
+  <tool> [args...]                       start a session (runs npx <tool> in a PTY)
+  send  <session> <text> [--wait]        send keystrokes (--wait waits for new output)
+  read  <session> [--wait] [--timeout N] read terminal output (--wait blocks until new output)
+  stop  <session>                        stop a session
+  list                                   show active sessions
+  start <cmd> [args...]                  explicit start (for non-npx commands)
+
+flags:
+  --wait, -w         block until new output appears (for send and read)
+  --timeout <ms>     max wait time in ms (default: 30000, used with --wait)
 
 the session name is auto-derived from the tool (e.g. "workos" → session "workos").
 
-example workflow:
-  npx noninteractive workos                 # starts "npx workos", session = "workos"
-  npx noninteractive read workos            # see what's on screen
-  npx noninteractive send workos ""         # press Enter
-  npx noninteractive send workos "y"        # type "y" and press Enter
-  npx noninteractive read workos            # see updated output
-  npx noninteractive stop workos            # done, stop the session
+example workflow (recommended — uses --wait to minimize round-trips):
+  npx noninteractive workos                    # starts "npx workos", session = "workos"
+  npx noninteractive send workos "" --wait     # press Enter, wait for response
+  npx noninteractive send workos "y" --wait    # type "y", wait for response
+  npx noninteractive read workos --wait        # wait for new output (e.g. OAuth callback)
+  npx noninteractive stop workos               # done, stop the session
 
 more examples:
   npx noninteractive vercel                 # session "vercel"
@@ -74,13 +77,13 @@ async function start(cmdArgs: string[]) {
 					`\n[session '${name}' already running — read the output above, then use:]`,
 				);
 				console.log(
-					`  npx noninteractive send ${name} "<text>"   # send keystrokes (use "" for Enter)`,
+					`  npx noninteractive send ${name} "<text>" --wait  # send and wait for response`,
 				);
 				console.log(
-					`  npx noninteractive read ${name}             # read updated output`,
+					`  npx noninteractive read ${name} --wait        # wait for new output`,
 				);
 				console.log(
-					`  npx noninteractive stop ${name}             # stop the session`,
+					`  npx noninteractive stop ${name}               # stop the session`,
 				);
 				return;
 			}
@@ -151,13 +154,13 @@ async function start(cmdArgs: string[]) {
 						`\n[session '${name}' started — read the output above, then use:]`,
 					);
 					console.log(
-						`  npx noninteractive send ${name} "<text>"   # send keystrokes (use "" for Enter)`,
+						`  npx noninteractive send ${name} "<text>" --wait  # send and wait for response`,
 					);
 					console.log(
-						`  npx noninteractive read ${name}             # read updated output`,
+						`  npx noninteractive read ${name} --wait        # wait for new output`,
 					);
 					console.log(
-						`  npx noninteractive stop ${name}             # stop the session`,
+						`  npx noninteractive stop ${name}               # stop the session`,
 					);
 				}
 				return;
@@ -182,28 +185,46 @@ async function start(cmdArgs: string[]) {
 	}
 
 	console.log(`[session '${name}' started but no output yet — use:]`);
-	console.log(`  npx noninteractive read ${name}             # read output`);
 	console.log(
-		`  npx noninteractive send ${name} "<text>"   # send keystrokes (use "" for Enter)`,
+		`  npx noninteractive send ${name} "<text>" --wait  # send and wait for response`,
 	);
 	console.log(
-		`  npx noninteractive stop ${name}             # stop the session`,
+		`  npx noninteractive read ${name} --wait        # wait for new output`,
+	);
+	console.log(
+		`  npx noninteractive stop ${name}               # stop the session`,
 	);
 }
 
-async function read(name: string) {
+async function read(name: string, wait: boolean, timeout: number) {
 	const sock = socketPath(name);
-	const res = await sendMessage(sock, { action: "read" });
+	const msg: Record<string, unknown> = { action: "read" };
+	if (wait) {
+		msg.wait = true;
+		msg.timeout = timeout;
+	}
+	const clientTimeout = wait ? timeout + 5000 : 5000;
+	const res = await sendMessage(sock, msg, clientTimeout);
 	if (res.output !== undefined) process.stdout.write(res.output);
 	if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
 }
 
-async function send(name: string, text: string) {
+async function send(name: string, text: string, wait: boolean, timeout: number) {
 	const sock = socketPath(name);
-	await sendMessage(sock, { action: "send", data: text });
-	console.log(
-		`[sent to '${name}' — run "npx noninteractive read ${name}" to see the result]`,
-	);
+	if (wait) {
+		const res = await sendMessage(
+			sock,
+			{ action: "sendread", data: text, timeout },
+			timeout + 5000,
+		);
+		if (res.output !== undefined) process.stdout.write(res.output);
+		if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
+	} else {
+		await sendMessage(sock, { action: "send", data: text });
+		console.log(
+			`[sent to '${name}' — run "npx noninteractive read ${name}" to see the result]`,
+		);
+	}
 }
 
 async function stop(name: string) {
@@ -258,25 +279,35 @@ async function main() {
 			return start(args.slice(1));
 		}
 		case "read": {
-			const name = args[1];
+			const readArgs = args.slice(1);
+			const name = readArgs.find((a) => !a.startsWith("-"));
 			if (!name) {
 				console.error(
-					"usage: noninteractive read <session>\n\nexample: npx noninteractive read vercel",
+					"usage: noninteractive read <session> [-w|--wait] [--timeout <ms>]\n\nexample: npx noninteractive read vercel --wait",
 				);
 				process.exit(1);
 			}
-			return read(name);
+			const wait = readArgs.includes("-w") || readArgs.includes("--wait");
+			const timeoutIdx = readArgs.indexOf("--timeout");
+			const timeout = timeoutIdx !== -1 ? Number(readArgs[timeoutIdx + 1]) : 30000;
+			return read(name, wait, timeout);
 		}
+		case "sendread":
 		case "send": {
-			const name = args[1];
-			const text = args[2];
+			const sendArgs = args.slice(1);
+			const positional = sendArgs.filter((a) => !a.startsWith("-"));
+			const name = positional[0];
+			const text = positional[1];
 			if (!name || text === undefined) {
 				console.error(
-					'usage: noninteractive send <session> <text>\n\nexample: npx noninteractive send vercel "y"',
+					'usage: noninteractive send <session> <text> [--wait] [--timeout <ms>]\n\nexample: npx noninteractive send workos "" --wait',
 				);
 				process.exit(1);
 			}
-			return send(name, text);
+			const wait = cmd === "sendread" || sendArgs.includes("-w") || sendArgs.includes("--wait");
+			const timeoutIdx = sendArgs.indexOf("--timeout");
+			const timeout = timeoutIdx !== -1 ? Number(sendArgs[timeoutIdx + 1]) : 30000;
+			return send(name, text, wait, timeout);
 		}
 		case "stop": {
 			const name = args[1];

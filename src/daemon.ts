@@ -5,8 +5,10 @@ import { dirname, resolve } from "node:path";
 import { ensureSessionsDir, socketPath } from "./paths";
 
 interface DaemonMessage {
-	action: "read" | "send" | "stop" | "status";
+	action: "read" | "send" | "sendread" | "stop" | "status";
 	data?: string;
+	wait?: boolean;
+	timeout?: number;
 }
 
 function getPtyBridge(): string {
@@ -44,6 +46,17 @@ export function runDaemon(
 	let processExited = false;
 	let exitCode: number | null = null;
 
+	type Waiter = { resolve: (output: string) => void; timer: ReturnType<typeof setTimeout> };
+	const waiters: Waiter[] = [];
+
+	function notifyWaiters() {
+		while (waiters.length > 0) {
+			const w = waiters.shift()!;
+			clearTimeout(w.timer);
+			w.resolve(outputBuffer);
+		}
+	}
+
 	const ptyBridge = getPtyBridge();
 	const proc = spawn(ptyBridge, [executable, ...args], {
 		stdio: ["pipe", "pipe", "pipe"],
@@ -54,16 +67,19 @@ export function runDaemon(
 
 	stdout?.on("data", (chunk: Buffer) => {
 		outputBuffer += chunk.toString();
+		notifyWaiters();
 	});
 
 	stderr?.on("data", (chunk: Buffer) => {
 		outputBuffer += chunk.toString();
+		notifyWaiters();
 	});
 
 	proc.on("exit", (code) => {
 		processExited = true;
 		exitCode = code;
 		outputBuffer += `\n[exited ${code}]`;
+		notifyWaiters();
 
 		setTimeout(() => {
 			server.close();
@@ -92,17 +108,43 @@ export function runDaemon(
 		});
 	});
 
+	function respondWithOutput(socket: Socket) {
+		socket.end(
+			JSON.stringify({
+				ok: true,
+				output: outputBuffer,
+				exited: processExited,
+				exitCode,
+			}),
+		);
+	}
+
+	function waitForNewOutput(socket: Socket, sinceLength: number, timeout: number) {
+		if (outputBuffer.length > sinceLength || processExited) {
+			respondWithOutput(socket);
+			return;
+		}
+
+		const waiter: Waiter = {
+			resolve: () => respondWithOutput(socket),
+			timer: setTimeout(() => {
+				const idx = waiters.indexOf(waiter);
+				if (idx !== -1) waiters.splice(idx, 1);
+				respondWithOutput(socket);
+			}, timeout),
+		};
+		waiters.push(waiter);
+	}
+
 	function handle(msg: DaemonMessage, socket: Socket) {
 		switch (msg.action) {
 			case "read":
-				socket.end(
-					JSON.stringify({
-						ok: true,
-						output: outputBuffer,
-						exited: processExited,
-						exitCode,
-					}),
-				);
+				if (msg.wait) {
+					const timeout = msg.timeout ?? 30000;
+					waitForNewOutput(socket, outputBuffer.length, timeout);
+				} else {
+					respondWithOutput(socket);
+				}
 				break;
 
 			case "send":
@@ -113,6 +155,18 @@ export function runDaemon(
 				stdin?.write(`${msg.data}\r`);
 				socket.end(JSON.stringify({ ok: true }));
 				break;
+
+			case "sendread": {
+				if (processExited) {
+					socket.end(JSON.stringify({ ok: false, error: "process exited" }));
+					break;
+				}
+				const beforeLength = outputBuffer.length;
+				const timeout = msg.timeout ?? 30000;
+				stdin?.write(`${msg.data}\r`);
+				waitForNewOutput(socket, beforeLength, timeout);
+				break;
+			}
 
 			case "stop":
 				proc.kill("SIGTERM");
