@@ -358,8 +358,10 @@ async function main() {
 			console.log(HELP);
 			break;
 		default:
-			// treat unknown commands as: start npx <args>
-			return start(["npx", ...args]);
+			// treat unknown commands as: start npx --yes <args>
+			// --yes auto-accepts package installs so the session doesn't hang on a prompt
+			console.log(`[installing and running: npx ${args.join(" ")}]`);
+			return start(["npx", "--yes", ...args]);
 	}
 }
 
