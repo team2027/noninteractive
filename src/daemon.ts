@@ -16,8 +16,10 @@ function getPtyBridge(): string {
 	const arch = process.arch;
 	const binaryName = `ptybridge-${platform}-${arch}`;
 
+	const scriptDir = dirname(process.argv[1] || process.execPath);
 	const candidates = [
-		resolve(dirname(process.argv[1] || process.execPath), "native", binaryName),
+		resolve(scriptDir, "..", "native", binaryName),
+		resolve(scriptDir, "native", binaryName),
 		resolve(dirname(import.meta.dirname), "native", binaryName),
 		resolve(import.meta.dirname, "..", "native", binaryName),
 	];
