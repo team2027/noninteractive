@@ -1,0 +1,11 @@
+src/
+ptybridge/
+site/
+bin/noninteractive
+bin/2027
+*.tgz
+.idea
+.DS_Store
+.cache
+*.tsbuildinfo
+coverage
