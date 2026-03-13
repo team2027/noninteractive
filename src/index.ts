@@ -36,8 +36,20 @@ more examples:
   npx noninteractive start vercel login     # explicit start for non-npx commands`;
 
 function getSelfCommand(): string[] {
-	if (process.argv[1] && /\.(ts|js)$/.test(process.argv[1])) {
-		return [process.argv[0], process.argv[1]];
+	const script = process.argv[1];
+	if (!script) return [process.argv[0]];
+
+	// resolve symlinks (npx creates .bin/noninteractive -> ../noninteractive/bin/noninteractive.js)
+	const { realpathSync } = require("node:fs");
+	try {
+		const real = realpathSync(script);
+		if (/\.(ts|js)$/.test(real)) {
+			return [process.argv[0], real];
+		}
+	} catch {}
+
+	if (/\.(ts|js)$/.test(script)) {
+		return [process.argv[0], script];
 	}
 	return [process.argv[0]];
 }
@@ -209,7 +221,12 @@ async function read(name: string, wait: boolean, timeout: number) {
 	if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
 }
 
-async function send(name: string, text: string, wait: boolean, timeout: number) {
+async function send(
+	name: string,
+	text: string,
+	wait: boolean,
+	timeout: number,
+) {
 	const sock = socketPath(name);
 	if (wait) {
 		const res = await sendMessage(
@@ -289,7 +306,8 @@ async function main() {
 			}
 			const wait = readArgs.includes("-w") || readArgs.includes("--wait");
 			const timeoutIdx = readArgs.indexOf("--timeout");
-			const timeout = timeoutIdx !== -1 ? Number(readArgs[timeoutIdx + 1]) : 30000;
+			const timeout =
+				timeoutIdx !== -1 ? Number(readArgs[timeoutIdx + 1]) : 30000;
 			return read(name, wait, timeout);
 		}
 		case "sendread":
@@ -304,9 +322,13 @@ async function main() {
 				);
 				process.exit(1);
 			}
-			const wait = cmd === "sendread" || sendArgs.includes("-w") || sendArgs.includes("--wait");
+			const wait =
+				cmd === "sendread" ||
+				sendArgs.includes("-w") ||
+				sendArgs.includes("--wait");
 			const timeoutIdx = sendArgs.indexOf("--timeout");
-			const timeout = timeoutIdx !== -1 ? Number(sendArgs[timeoutIdx + 1]) : 30000;
+			const timeout =
+				timeoutIdx !== -1 ? Number(sendArgs[timeoutIdx + 1]) : 30000;
 			return send(name, text, wait, timeout);
 		}
 		case "stop": {

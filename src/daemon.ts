@@ -48,14 +48,18 @@ export function runDaemon(
 	let processExited = false;
 	let exitCode: number | null = null;
 
-	type Waiter = { resolve: (output: string) => void; timer: ReturnType<typeof setTimeout> };
+	type Waiter = {
+		resolve: (output: string) => void;
+		timer: ReturnType<typeof setTimeout>;
+	};
 	const waiters: Waiter[] = [];
 
 	function notifyWaiters() {
-		while (waiters.length > 0) {
-			const w = waiters.shift()!;
+		let w = waiters.shift();
+		while (w) {
 			clearTimeout(w.timer);
 			w.resolve(outputBuffer);
+			w = waiters.shift();
 		}
 	}
 
@@ -121,7 +125,11 @@ export function runDaemon(
 		);
 	}
 
-	function waitForNewOutput(socket: Socket, sinceLength: number, timeout: number) {
+	function waitForNewOutput(
+		socket: Socket,
+		sinceLength: number,
+		timeout: number,
+	) {
 		if (outputBuffer.length > sinceLength || processExited) {
 			respondWithOutput(socket);
 			return;
