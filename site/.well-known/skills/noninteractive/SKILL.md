@@ -2,26 +2,22 @@
 name: noninteractive
 description: Run interactive CLI commands (setup wizards, login flows, installers) non-interactively using npx noninteractive. Use when you need to run a CLI tool that has interactive prompts, OAuth flows, or terminal-based menus that cannot be bypassed with flags.
 compatibility: Requires Node.js 18+ or Bun. Works on macOS and Linux (x86_64, arm64).
+allowed-tools: Bash(npx noninteractive *)
+argument-hint: "<tool> [args...]"
 metadata:
   author: 2027dev
-  version: "1.3"
+  version: "1.4"
 ---
 
 # noninteractive
 
-Use `npx noninteractive` to drive interactive CLI tools without a human. It spawns commands in a real pseudo-terminal (PTY) and lets you send keystrokes and read output programmatically.
+Run the interactive CLI command non-interactively:
 
-## When to use this skill
+```bash
+npx noninteractive $ARGUMENTS
+```
 
-Use noninteractive when:
-- A CLI tool requires interactive input (setup wizards, login flows, confirmation prompts)
-- There is no `--yes`, `--non-interactive`, or `--headless` flag available
-- The command uses terminal menus (@clack/prompts, inquirer, etc.)
-- You need to complete an OAuth or authentication flow in a CLI
-
-Do NOT use noninteractive when:
-- The CLI tool has a non-interactive mode or `--yes` flag — use that instead
-- You're running a simple command that doesn't need user input
+Read the initial output, then drive the session using the workflow below.
 
 ## Commands
 
@@ -115,6 +111,7 @@ npx noninteractive stop workos
 - **Sessions persist**: Sessions run as background daemons. Use `list` to see active sessions.
 - **Real PTY**: The child process sees `isTTY=true`. Terminal menus and raw mode work correctly.
 - **Default timeout**: `--wait` defaults to 30s. Use `--timeout <ms>` to change.
+- **OAuth URLs auto-open**: URLs detected in output are automatically opened in the browser. Use `--no-open` to disable.
 
 ## Handling common patterns
 
