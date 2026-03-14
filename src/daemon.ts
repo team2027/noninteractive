@@ -106,6 +106,7 @@ export function runDaemon(
 	let processExited = false;
 	let exitCode: number | null = null;
 	const detectedUrls = new Set<string>();
+	const reportedUrls = new Set<string>();
 
 	type Waiter = {
 		resolve: (output: string) => void;
@@ -206,14 +207,17 @@ export function runDaemon(
 
 	function respondWithOutput(socket: Socket) {
 		readInterceptedUrls();
-		const urls = Array.from(detectedUrls);
+		const newUrls = Array.from(detectedUrls).filter(
+			(u) => !reportedUrls.has(u),
+		);
+		for (const u of newUrls) reportedUrls.add(u);
 		socket.end(
 			JSON.stringify({
 				ok: true,
 				output: outputBuffer,
 				exited: processExited,
 				exitCode,
-				...(urls.length > 0 ? { urls } : {}),
+				...(newUrls.length > 0 ? { urls: newUrls } : {}),
 			}),
 		);
 	}
