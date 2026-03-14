@@ -11,7 +11,23 @@ metadata:
 
 # noninteractive
 
-Run the interactive CLI command non-interactively:
+Use `npx noninteractive` to drive interactive CLI tools without a human. It spawns commands in a real pseudo-terminal (PTY) and lets you send keystrokes and read output programmatically.
+
+## When to use this skill
+
+Use noninteractive when:
+- A CLI tool requires interactive input (setup wizards, login flows, confirmation prompts)
+- There is no `--yes`, `--non-interactive`, or `--headless` flag available
+- The command uses terminal menus (@clack/prompts, inquirer, etc.)
+- You need to complete an OAuth or authentication flow in a CLI
+
+Do NOT use noninteractive when:
+- The CLI tool has a non-interactive mode or `--yes` flag — use that instead
+- You're running a simple command that doesn't need user input
+
+## Quick start
+
+If arguments were provided, run:
 
 ```bash
 npx noninteractive $ARGUMENTS
