@@ -35,6 +35,14 @@ more examples:
   npx noninteractive supabase init          # session "supabase"
   npx noninteractive start vercel login     # explicit start for non-npx commands`;
 
+const stripAnsi = (s: string) =>
+	s
+		.replace(
+			/\x1b\[[\x20-\x3f]*[\x40-\x7e]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][A-Z0-9]|\x1b[\x20-\x2f]*[\x30-\x7e]|\x07/g,
+			"",
+		)
+		.replace(/\r\n?/g, "\n");
+
 function getSelfCommand(): string[] {
 	const script = process.argv[1];
 	if (!script) return [process.argv[0]];
@@ -75,7 +83,7 @@ async function start(cmdArgs: string[]) {
 	try {
 		const res = await sendMessage(sock, { action: "read" });
 		if (res.ok) {
-			process.stdout.write(res.output ?? "");
+			process.stdout.write(stripAnsi(res.output ?? ""));
 			if (res.exited) {
 				console.log(
 					`\n[session '${name}' already exists but exited ${res.exitCode} — stopping it]`,
@@ -139,15 +147,13 @@ async function start(cmdArgs: string[]) {
 	}
 
 	// poll until we get meaningful output (up to 10s)
-	const stripAnsi = (s: string) =>
-		s.replace(/\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07/g, "");
 	for (let i = 0; i < 50; i++) {
 		await new Promise((r) => setTimeout(r, 200));
 		try {
 			const res = await sendMessage(sock, { action: "read" });
 			const clean = stripAnsi(res.output ?? "").trim();
 			if (clean.length > 10) {
-				process.stdout.write(res.output);
+				process.stdout.write(stripAnsi(res.output));
 				if (res.exited) {
 					console.log(
 						`\n[session '${name}' exited ${res.exitCode} — the command failed]`,
@@ -178,7 +184,7 @@ async function start(cmdArgs: string[]) {
 				return;
 			}
 			if (res.exited) {
-				process.stdout.write(res.output ?? "");
+				process.stdout.write(stripAnsi(res.output ?? ""));
 				console.log(
 					`\n[session '${name}' exited ${res.exitCode} — the command failed]`,
 				);
@@ -217,7 +223,7 @@ async function read(name: string, wait: boolean, timeout: number) {
 	}
 	const clientTimeout = wait ? timeout + 5000 : 5000;
 	const res = await sendMessage(sock, msg, clientTimeout);
-	if (res.output !== undefined) process.stdout.write(res.output);
+	if (res.output !== undefined) process.stdout.write(stripAnsi(res.output));
 	if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
 }
 
@@ -234,7 +240,7 @@ async function send(
 			{ action: "sendread", data: text, timeout },
 			timeout + 5000,
 		);
-		if (res.output !== undefined) process.stdout.write(res.output);
+		if (res.output !== undefined) process.stdout.write(stripAnsi(res.output));
 		if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
 	} else {
 		await sendMessage(sock, { action: "send", data: text });
