@@ -34,6 +34,16 @@ bun run build      # compiles to bin/noninteractive standalone binary
 bun run build:pty  # cross-compiles Go PTY bridge for all platforms
 ```
 
+## URL interception
+
+OAuth/browser URLs are auto-detected and opened client-side. Three layers:
+
+1. **Shadow scripts** — `open`/`xdg-open`/`browser-open` wrappers in `~/.noninteractive/sessions/<name>/bin/` intercept browser-open calls and write URLs to a file. Session bin dir prepended to PATH, `BROWSER` env points to `browser-open` script.
+2. **Output scanning** — daemon scans stdout/stderr for `https?://` URLs. Merges with intercepted URLs. All URLs returned in `urls` array on every response.
+3. **Client-side opening** — client auto-opens new URLs via platform `open`/`xdg-open`. `--no-open` disables auto-opening.
+
+Session dirs (bin/, urls file) cleaned up on stop/exit.
+
 ## Notes
 
 - daemon uses node:child_process and node:net (not Bun-specific APIs) for subprocess/socket — needed for detached spawn and unix socket server

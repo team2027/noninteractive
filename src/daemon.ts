@@ -1,8 +1,22 @@
 import { spawn } from "node:child_process";
-import { unlinkSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	rmSync,
+	unlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { createServer, type Socket } from "node:net";
 import { dirname, resolve } from "node:path";
-import { ensureSessionsDir, socketPath } from "./paths";
+import {
+	ensureSessionsDir,
+	sessionBinDir,
+	sessionDir,
+	sessionUrlsFile,
+	socketPath,
+} from "./paths";
 
 interface DaemonMessage {
 	action: "read" | "send" | "sendread" | "stop" | "status";
@@ -32,6 +46,48 @@ function getPtyBridge(): string {
 	return candidates[0];
 }
 
+const URL_RE = /https?:\/\/[^\s<>"')\]]+/g;
+
+function createInterceptorScripts(name: string) {
+	const binDir = sessionBinDir(name);
+	const urlsFile = sessionUrlsFile(name);
+	mkdirSync(binDir, { recursive: true });
+
+	// macOS: shadow `open` — only intercept http/https URLs, pass everything else through
+	const openScript = `#!/bin/sh
+case "$1" in
+  http://*|https://*) echo "$1" >> "${urlsFile}" ;;
+  *) /usr/bin/open "$@" ;;
+esac
+`;
+
+	// linux: shadow xdg-open
+	const xdgOpenScript = `#!/bin/sh
+echo "$1" >> "${urlsFile}"
+`;
+
+	// BROWSER env var target
+	const browserOpenScript = `#!/bin/sh
+echo "$1" >> "${urlsFile}"
+`;
+
+	for (const [file, content] of [
+		["open", openScript],
+		["xdg-open", xdgOpenScript],
+		["browser-open", browserOpenScript],
+	] as const) {
+		const path = resolve(binDir, file);
+		writeFileSync(path, content);
+		chmodSync(path, 0o755);
+	}
+}
+
+function cleanupSession(name: string) {
+	try {
+		rmSync(sessionDir(name), { recursive: true, force: true });
+	} catch {}
+}
+
 export function runDaemon(
 	sessionName: string,
 	executable: string,
@@ -44,9 +100,12 @@ export function runDaemon(
 		unlinkSync(sock);
 	} catch {}
 
+	createInterceptorScripts(sessionName);
+
 	let outputBuffer = "";
 	let processExited = false;
 	let exitCode: number | null = null;
+	const detectedUrls = new Set<string>();
 
 	type Waiter = {
 		resolve: (output: string) => void;
@@ -63,21 +122,51 @@ export function runDaemon(
 		}
 	}
 
+	const binDir = sessionBinDir(sessionName);
 	const ptyBridge = getPtyBridge();
 	const proc = spawn(ptyBridge, [executable, ...args], {
 		stdio: ["pipe", "pipe", "pipe"],
-		env: { ...process.env, TERM: "xterm-256color" },
+		env: {
+			...process.env,
+			TERM: "xterm-256color",
+			BROWSER: resolve(binDir, "browser-open"),
+			PATH: `${binDir}:${process.env.PATH}`,
+		},
 	});
 
 	const { stdout, stderr, stdin } = proc;
 
+	function scanForUrls(text: string) {
+		const matches = text.match(URL_RE);
+		if (matches) {
+			for (const url of matches) detectedUrls.add(url);
+		}
+	}
+
+	function readInterceptedUrls() {
+		const urlsFile = sessionUrlsFile(sessionName);
+		try {
+			if (!existsSync(urlsFile)) return;
+			const content = readFileSync(urlsFile, "utf-8");
+			const lines = content.split("\n");
+			for (const line of lines) {
+				const trimmed = line.trim();
+				if (trimmed) detectedUrls.add(trimmed);
+			}
+		} catch {}
+	}
+
 	stdout?.on("data", (chunk: Buffer) => {
-		outputBuffer += chunk.toString();
+		const text = chunk.toString();
+		outputBuffer += text;
+		scanForUrls(text);
 		notifyWaiters();
 	});
 
 	stderr?.on("data", (chunk: Buffer) => {
-		outputBuffer += chunk.toString();
+		const text = chunk.toString();
+		outputBuffer += text;
+		scanForUrls(text);
 		notifyWaiters();
 	});
 
@@ -92,6 +181,7 @@ export function runDaemon(
 			try {
 				unlinkSync(sock);
 			} catch {}
+			cleanupSession(sessionName);
 			process.exit(0);
 		}, 60_000);
 	});
@@ -115,12 +205,15 @@ export function runDaemon(
 	});
 
 	function respondWithOutput(socket: Socket) {
+		readInterceptedUrls();
+		const urls = Array.from(detectedUrls);
 		socket.end(
 			JSON.stringify({
 				ok: true,
 				output: outputBuffer,
 				exited: processExited,
 				exitCode,
+				...(urls.length > 0 ? { urls } : {}),
 			}),
 		);
 	}
@@ -186,6 +279,7 @@ export function runDaemon(
 					try {
 						unlinkSync(sock);
 					} catch {}
+					cleanupSession(sessionName);
 					process.exit(0);
 				}, 500);
 				break;

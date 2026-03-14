@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
-import { spawn } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { sendMessage } from "./client";
+import { type DaemonResponse, sendMessage } from "./client";
 import { ensureSessionsDir, socketPath } from "./paths";
 
 const HELP = `noninteractive — run interactive CLI commands non-interactively.
@@ -20,6 +20,7 @@ commands:
 flags:
   --wait, -w         block until new output appears (for send and read)
   --timeout <ms>     max wait time in ms (default: 30000, used with --wait)
+  --no-open          don't auto-open URLs in browser (still shown in output)
 
 the session name is auto-derived from the tool (e.g. "workos" → session "workos").
 
@@ -42,6 +43,29 @@ const stripAnsi = (s: string) =>
 			"",
 		)
 		.replace(/\r\n?/g, "\n");
+
+const seenUrls = new Set<string>();
+
+function openUrl(url: string) {
+	try {
+		const cmd = process.platform === "darwin" ? "open" : "xdg-open";
+		execSync(`${cmd} ${JSON.stringify(url)}`, { stdio: "ignore" });
+	} catch {}
+}
+
+function handleUrls(res: DaemonResponse, noOpen: boolean) {
+	if (!res.urls || res.urls.length === 0) return;
+	for (const url of res.urls) {
+		if (seenUrls.has(url)) continue;
+		seenUrls.add(url);
+		if (!noOpen) {
+			openUrl(url);
+			process.stderr.write(`[opened: ${url}]\n`);
+		} else {
+			process.stderr.write(`[url: ${url}]\n`);
+		}
+	}
+}
 
 function getSelfCommand(): string[] {
 	const script = process.argv[1];
@@ -78,7 +102,7 @@ function deriveSessionName(cmd: string, args: string[]): string {
 		.replace(/[^a-zA-Z0-9_-]/g, "");
 }
 
-async function start(cmdArgs: string[]) {
+async function start(cmdArgs: string[], noOpen = false) {
 	const executable = cmdArgs[0];
 	const args = cmdArgs.slice(1);
 	const name = deriveSessionName(executable, args);
@@ -88,6 +112,7 @@ async function start(cmdArgs: string[]) {
 		const res = await sendMessage(sock, { action: "read" });
 		if (res.ok) {
 			process.stdout.write(stripAnsi(res.output ?? ""));
+			handleUrls(res, noOpen);
 			if (res.exited) {
 				console.log(
 					`\n[session '${name}' already exists but exited ${res.exitCode} — stopping it]`,
@@ -155,6 +180,7 @@ async function start(cmdArgs: string[]) {
 		await new Promise((r) => setTimeout(r, 200));
 		try {
 			const res = await sendMessage(sock, { action: "read" });
+			handleUrls(res, noOpen);
 			const clean = stripAnsi(res.output ?? "").trim();
 			if (clean.length > 10) {
 				process.stdout.write(stripAnsi(res.output));
@@ -218,7 +244,12 @@ async function start(cmdArgs: string[]) {
 	);
 }
 
-async function read(name: string, wait: boolean, timeout: number) {
+async function read(
+	name: string,
+	wait: boolean,
+	timeout: number,
+	noOpen = false,
+) {
 	const sock = socketPath(name);
 	const msg: Record<string, unknown> = { action: "read" };
 	if (wait) {
@@ -228,6 +259,7 @@ async function read(name: string, wait: boolean, timeout: number) {
 	const clientTimeout = wait ? timeout + 5000 : 5000;
 	const res = await sendMessage(sock, msg, clientTimeout);
 	if (res.output !== undefined) process.stdout.write(stripAnsi(res.output));
+	handleUrls(res, noOpen);
 	if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
 }
 
@@ -236,6 +268,7 @@ async function send(
 	text: string,
 	wait: boolean,
 	timeout: number,
+	noOpen = false,
 ) {
 	const sock = socketPath(name);
 	if (wait) {
@@ -245,6 +278,7 @@ async function send(
 			timeout + 5000,
 		);
 		if (res.output !== undefined) process.stdout.write(stripAnsi(res.output));
+		handleUrls(res, noOpen);
 		if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
 	} else {
 		await sendMessage(sock, { action: "send", data: text });
@@ -297,16 +331,19 @@ async function main() {
 
 	switch (cmd) {
 		case "start": {
-			if (args.length < 2) {
+			const startArgs = args.slice(1).filter((a) => a !== "--no-open");
+			const noOpen = args.includes("--no-open");
+			if (startArgs.length < 1) {
 				console.error(
 					"usage: noninteractive start <cmd> [args...]\n\nexample: npx noninteractive start npx vercel",
 				);
 				process.exit(1);
 			}
-			return start(args.slice(1));
+			return start(startArgs, noOpen);
 		}
 		case "read": {
 			const readArgs = args.slice(1);
+			const noOpen = readArgs.includes("--no-open");
 			const name = readArgs.find((a) => !a.startsWith("-"));
 			if (!name) {
 				console.error(
@@ -318,11 +355,12 @@ async function main() {
 			const timeoutIdx = readArgs.indexOf("--timeout");
 			const timeout =
 				timeoutIdx !== -1 ? Number(readArgs[timeoutIdx + 1]) : 30000;
-			return read(name, wait, timeout);
+			return read(name, wait, timeout, noOpen);
 		}
 		case "sendread":
 		case "send": {
 			const sendArgs = args.slice(1);
+			const noOpen = sendArgs.includes("--no-open");
 			const positional = sendArgs.filter((a) => !a.startsWith("-"));
 			const name = positional[0];
 			const text = positional[1];
@@ -339,7 +377,7 @@ async function main() {
 			const timeoutIdx = sendArgs.indexOf("--timeout");
 			const timeout =
 				timeoutIdx !== -1 ? Number(sendArgs[timeoutIdx + 1]) : 30000;
-			return send(name, text, wait, timeout);
+			return send(name, text, wait, timeout, noOpen);
 		}
 		case "stop": {
 			const name = args[1];
@@ -367,11 +405,14 @@ async function main() {
 		case "-h":
 			console.log(HELP);
 			break;
-		default:
+		default: {
 			// treat unknown commands as: start npx --yes <args>
 			// --yes auto-accepts package installs so the session doesn't hang on a prompt
-			console.log(`[installing and running: npx ${args.join(" ")}]`);
-			return start(["npx", "--yes", ...args]);
+			const noOpen = args.includes("--no-open");
+			const filteredArgs = args.filter((a) => a !== "--no-open");
+			console.log(`[installing and running: npx ${filteredArgs.join(" ")}]`);
+			return start(["npx", "--yes", ...filteredArgs], noOpen);
+		}
 	}
 }
 

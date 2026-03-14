@@ -8,6 +8,7 @@ export interface DaemonResponse {
 	running?: boolean;
 	pid?: number;
 	error?: string;
+	urls?: string[];
 }
 
 export function sendMessage(

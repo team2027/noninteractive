@@ -11,3 +11,15 @@ export function ensureSessionsDir() {
 export function socketPath(name: string) {
 	return resolve(SESSIONS_DIR, `${name}.sock`);
 }
+
+export function sessionDir(name: string) {
+	return resolve(SESSIONS_DIR, name);
+}
+
+export function sessionBinDir(name: string) {
+	return resolve(SESSIONS_DIR, name, "bin");
+}
+
+export function sessionUrlsFile(name: string) {
+	return resolve(SESSIONS_DIR, name, "urls");
+}

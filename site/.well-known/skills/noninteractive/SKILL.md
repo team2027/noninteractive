@@ -122,9 +122,13 @@ npx noninteractive stop workos
 Most modern CLI prompts accept Enter to confirm the current selection. Arrow key escape sequences are rarely needed.
 
 ### OAuth/browser flows
-1. The CLI prints a URL — extract it from the `send --wait` output
-2. Tell the user to open the URL and complete authentication
+URLs detected in output are automatically opened in the user's browser. The CLI intercepts `open`/`xdg-open` calls and scans output for URLs.
+
+1. Start the session — any OAuth URL will be auto-opened in the browser
+2. Tell the user to complete authentication in the opened browser tab
 3. Use `read --wait --timeout 60000` to block until the CLI detects the completed auth
+
+Use `--no-open` to disable auto-opening (URLs are still shown in stderr).
 
 ### Multiple sessions
 ```bash
