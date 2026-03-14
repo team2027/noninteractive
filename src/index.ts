@@ -70,8 +70,12 @@ function deriveSessionName(cmd: string, args: string[]): string {
 	// skip flags like -y, --yes
 	while (i < parts.length && parts[i].startsWith("-")) i++;
 	const name = parts[i] || cmd;
+	// strip version suffix @latest, @1.2.3, @^5 etc (but not scope prefix @foo/)
+	const stripped = name.replace(/(?<=.)@[^/].*$/, "");
 	// strip npm scope @foo/bar -> bar
-	return name.replace(/^@[^/]+\//, "").replace(/[^a-zA-Z0-9_-]/g, "");
+	return (stripped || name)
+		.replace(/^@[^/]+\//, "")
+		.replace(/[^a-zA-Z0-9_-]/g, "");
 }
 
 async function start(cmdArgs: string[]) {

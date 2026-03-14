@@ -61,7 +61,7 @@ npx noninteractive stop workos
 
 ## The `--wait` flag
 
-Both `send` and `read` support `--wait` (`-w`), which blocks until new output appears instead of returning immediately. This eliminates polling loops and reduces tool calls by ~7-10x.
+Both `send` and `read` support `--wait` (`-w`), which blocks until new output appears instead of returning immediately. This eliminates polling loops and reduces tool calls by ~7-10x. Output is returned as clean text with ANSI escape codes stripped by default, so agents get readable content without terminal formatting noise.
 
 ```bash
 # Old way (polling): send + read + read + read...

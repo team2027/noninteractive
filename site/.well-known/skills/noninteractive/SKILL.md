@@ -4,12 +4,12 @@ description: Run interactive CLI commands (setup wizards, login flows, installer
 compatibility: Requires Node.js 18+ or Bun. Works on macOS and Linux (x86_64, arm64).
 metadata:
   author: 2027dev
-  version: "1.2"
+  version: "1.3"
 ---
 
 # noninteractive
 
-Use `npx noninteractive` to drive interactive CLI tools without a human. It spawns commands in a real pseudo-terminal (PTY) and lets you read output and send keystrokes programmatically.
+Use `npx noninteractive` to drive interactive CLI tools without a human. It spawns commands in a real pseudo-terminal (PTY) and lets you send keystrokes and read output programmatically.
 
 ## When to use this skill
 
@@ -27,15 +27,21 @@ Do NOT use noninteractive when:
 
 ```
 npx noninteractive <tool> [args...]                  # Start a session (runs npx <tool>)
-npx noninteractive send <session> <text> [--wait]    # Send keystrokes (--wait for response)
-npx noninteractive read <session> [--wait]           # Read terminal output (--wait blocks)
+npx noninteractive send <session> <text> --wait      # Send keystrokes, RETURNS output
+npx noninteractive read <session> --wait             # Wait for output without sending
 npx noninteractive stop <session>                    # Stop session
 npx noninteractive list                              # Show active sessions
 ```
 
-## Step-by-step workflow
+## Critical: `send --wait` returns output
 
-**Always use `--wait` flag** on `send` and `read` to avoid polling. This blocks until new output appears, saving tool calls and tokens.
+**`send --wait` sends input AND returns the full terminal output.** You do NOT need to call `read` after `send --wait`. The response already contains everything printed to the terminal.
+
+The correct workflow is: **start → send --wait → send --wait → ... → stop**
+
+Only use `read --wait` when you need to wait for output *without* sending anything (e.g., waiting for an OAuth callback).
+
+## Step-by-step workflow
 
 ### 1. Start a session
 
@@ -43,38 +49,36 @@ npx noninteractive list                              # Show active sessions
 npx noninteractive <tool-name>
 ```
 
-This runs `npx <tool-name>` in a background PTY. The session name is the tool name (e.g., `npx noninteractive workos` → session `workos`). The start command already reads and prints initial output.
+This runs `npx <tool-name>` in a background PTY. The session name is the tool name (e.g., `npx noninteractive workos` → session `workos`). The start command prints initial output.
 
-### 2. Send input and wait for response
+**First run may be slow**: If npx needs to install the package, the first command can take 30-60+ seconds. Use `--timeout 60000` (or higher) on your first `send --wait` or `read --wait`.
+
+### 2. Send input and get response
 
 ```bash
-# Press Enter (confirm/select current option) and wait for next prompt
+# Press Enter (confirm/select current option), get response
 npx noninteractive send <session> "" --wait
 
-# Type text and press Enter, wait for response
+# Type text and press Enter, get response
 npx noninteractive send <session> "my-project-name" --wait
 
-# Type 'y' to confirm, wait for response
+# Type 'y' to confirm, get response
 npx noninteractive send <session> "y" --wait
 ```
 
-`send --wait` sends the keystrokes, then blocks until new output appears. This replaces the old pattern of `send` + polling `read` in a loop.
+Every `send` appends a carriage return (Enter key). Sending `""` is equivalent to pressing Enter.
 
-Every `send` appends a carriage return (Enter key) after the text. Sending `""` (empty string) is equivalent to pressing Enter.
+**Do not call `read` after `send --wait`** — the output is already in the response.
 
-### 3. Wait for output without sending (OAuth flows, long operations)
+### 3. Wait without sending (OAuth flows, long operations)
 
 ```bash
-npx noninteractive read <session> --wait
+npx noninteractive read <session> --wait --timeout 60000
 ```
 
-Use `read --wait` when you need to wait for output without sending input — for example, waiting for an OAuth callback to complete or a long operation to finish.
+Use `read --wait` only when waiting for something to happen without sending input — e.g., waiting for an OAuth callback or a long build.
 
-### 4. Repeat until done
-
-Continue the send → wait cycle until the CLI flow is complete.
-
-### 5. Stop the session
+### 4. Stop the session
 
 ```bash
 npx noninteractive stop <session>
@@ -85,49 +89,44 @@ npx noninteractive stop <session>
 ```bash
 # Start the WorkOS installer (prints initial output)
 npx noninteractive workos
-# Output: ◆  Run the AuthKit installer?
-#         │  ● Yes / ○ No
-#         └
+# Output: ◆  Run the AuthKit installer?  │  ● Yes / ○ No  └
 
-# Press Enter to select "Yes", wait for next prompt
+# Press Enter to select "Yes" — response includes next prompt
 npx noninteractive send workos "" --wait
-# Output: ◆  You are on main. Create a feature branch?
-#         │  ● Create feat/add-workos-authkit
-#         └
+# Output: ◆  You are on main. Create a feature branch?  │  ● Create feat/add-workos-authkit  └
 
-# Press Enter to confirm, wait for response
+# Press Enter to confirm — response includes next prompt
 npx noninteractive send workos "" --wait
 
-# Continue sending and waiting...
+# Type API key — response includes next prompt
 npx noninteractive send workos "my-api-key" --wait
 
-# When done, stop the session
+# Done
 npx noninteractive stop workos
 ```
 
 ## Important details
 
-- **Session names**: Auto-derived from the tool name. `workos` → session `workos`, `vercel` → session `vercel`.
-- **Output accumulates**: `read` returns ALL output since the session started, not just new output. Look at the end for the latest prompt.
-- **Send always appends Enter**: Every `send` adds a carriage return. To just press Enter, send an empty string `""`.
-- **Use --wait**: Always prefer `send --wait` over separate `send` + `read` calls. It's faster and uses fewer tool calls.
-- **Sessions persist**: Sessions run as background daemons. They survive even if your process exits. Use `list` to see active sessions.
-- **Real PTY**: The child process sees `isTTY=true`. Terminal menus, colors, and raw mode all work correctly.
-- **Timeout**: `--wait` defaults to 30s timeout. Use `--timeout <ms>` to change it.
+- **`send --wait` returns output**: Do not follow it with `read`. The output is already there.
+- **ANSI codes stripped**: Output is clean text — no escape sequences to parse.
+- **First run timeout**: npx may need to install the package. Use `--timeout 60000` or higher on the first wait.
+- **Output accumulates**: Output contains ALL text since session start. Look at the end for the latest prompt.
+- **Send always appends Enter**: To just press Enter, send `""`.
+- **Sessions persist**: Sessions run as background daemons. Use `list` to see active sessions.
+- **Real PTY**: The child process sees `isTTY=true`. Terminal menus and raw mode work correctly.
+- **Default timeout**: `--wait` defaults to 30s. Use `--timeout <ms>` to change.
 
 ## Handling common patterns
 
 ### Arrow key navigation
-For CLI menus that require arrow keys, you may need to send arrow key escape sequences. However, most modern CLI prompts accept Enter to confirm the current selection.
+Most modern CLI prompts accept Enter to confirm the current selection. Arrow key escape sequences are rarely needed.
 
 ### OAuth/browser flows
-If the CLI prints a URL to open for authentication:
-1. Read the output to find the URL
+1. The CLI prints a URL — extract it from the `send --wait` output
 2. Tell the user to open the URL and complete authentication
-3. Use `read --wait` to block until the CLI detects the completed auth and proceeds
+3. Use `read --wait --timeout 60000` to block until the CLI detects the completed auth
 
 ### Multiple sessions
-You can run multiple sessions simultaneously:
 ```bash
 npx noninteractive vercel
 npx noninteractive workos

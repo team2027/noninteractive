@@ -25,6 +25,8 @@ noninteractive list                            # show active sessions (alias: ls
 
 The `--wait` flag on `send` and `read` blocks until new output appears (default 30s timeout, configurable with `--timeout <ms>`). The daemon-side action for `send --wait` is `sendread`.
 
+Output is clean text by default — ANSI escape codes are stripped so agents get readable content without terminal formatting artifacts.
+
 ## Build
 
 ```
