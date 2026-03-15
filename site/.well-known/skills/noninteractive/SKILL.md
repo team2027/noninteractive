@@ -143,14 +143,14 @@ npx noninteractive workos
 # Output: ◆  Run the AuthKit installer?  │  ● Yes / ○ No  └
 
 # Press Enter to select "Yes" — response includes next prompt
-npx noninteractive send workos $'\r' --wait
+npx noninteractive send workos $'\r'
 # Output: ◆  You are on main. Create a feature branch?  │  ● Create feat/add-workos-authkit  └
 
 # Press Enter to confirm — response includes next prompt
-npx noninteractive send workos $'\r' --wait
+npx noninteractive send workos $'\r'
 
 # Type API key + Enter — response includes next prompt
-npx noninteractive send workos $'my-api-key\r' --wait
+npx noninteractive send workos $'my-api-key\r'
 
 # Done
 npx noninteractive stop workos
@@ -158,7 +158,7 @@ npx noninteractive stop workos
 
 ## Important details
 
-- **`send --wait` returns output**: Do not follow it with `read`. The output is already there.
+- **`send` returns output by default**: Do not follow it with `read`. The output is already there. Use `--no-wait` to fire-and-forget.
 - **No auto-Enter**: `send` sends text exactly as-is. Include `$'\r'` when you want to press Enter.
 - **ANSI codes stripped**: Output is clean text — no escape sequences to parse.
 - **First run timeout**: npx may need to install the package. Use `--timeout 60000` or higher on the first wait.
@@ -166,7 +166,7 @@ npx noninteractive stop workos
 - **Sessions persist**: Sessions run as background daemons. Use `list` to see active sessions.
 - **Parallel sessions**: If a session name is already taken, a suffix is added automatically (e.g., `eslint`, `eslint-2`, `eslint-3`).
 - **Real PTY**: The child process sees `isTTY=true`. Terminal menus and raw mode work correctly.
-- **Default timeout**: `--wait` defaults to 30s. Use `--timeout <ms>` to change.
+- **Default timeout**: `send` and `read --wait` default to 30s. Use `--timeout <ms>` to change.
 - **OAuth URLs auto-open**: URLs detected in output are automatically opened in the browser. Use `--no-open` to disable.
 
 ## Handling common patterns
@@ -177,10 +177,10 @@ Use escape sequences to navigate menus. Arrow keys alone do NOT confirm — send
 
 ```bash
 # Move down and confirm
-npx noninteractive send <session> $'\x1b[B\r' --wait
+npx noninteractive send <session> $'\x1b[B\r'
 
 # Move down twice without confirming
-npx noninteractive send <session> $'\x1b[B\x1b[B' --wait
+npx noninteractive send <session> $'\x1b[B\x1b[B'
 ```
 
 ### OAuth/browser flows
