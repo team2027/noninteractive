@@ -91,9 +91,18 @@ function deriveSessionName(cmd: string, args: string[]): string {
 	let i = 0;
 	// skip npx/bunx, flags, and -- separators to find the real tool name
 	while (i < parts.length) {
-		if (parts[i] === "npx" || parts[i] === "bunx") { i++; continue; }
-		if (parts[i] === "--") { i++; continue; }
-		if (parts[i].startsWith("-")) { i++; continue; }
+		if (parts[i] === "npx" || parts[i] === "bunx") {
+			i++;
+			continue;
+		}
+		if (parts[i] === "--") {
+			i++;
+			continue;
+		}
+		if (parts[i].startsWith("-")) {
+			i++;
+			continue;
+		}
 		break;
 	}
 	const name = parts[i] || cmd;
@@ -108,39 +117,32 @@ function deriveSessionName(cmd: string, args: string[]): string {
 async function start(cmdArgs: string[], noOpen = false) {
 	const executable = cmdArgs[0];
 	const args = cmdArgs.slice(1);
-	const name = deriveSessionName(executable, args);
-	const sock = socketPath(name);
+	const baseName = deriveSessionName(executable, args);
+	let name = baseName;
 
-	try {
-		const res = await sendMessage(sock, { action: "read" });
-		if (res.ok) {
-			process.stdout.write(stripAnsi(res.output ?? ""));
-			handleUrls(res, noOpen);
-			if (res.exited) {
-				console.log(
-					`\n[session '${name}' already exists but exited ${res.exitCode} — stopping it]`,
-				);
-				try {
-					await sendMessage(sock, { action: "stop" });
-				} catch {}
-				// fall through to start a new session
-			} else {
-				console.log(
-					`\n[session '${name}' already running — read the output above, then use:]`,
-				);
-				console.log(
-					`  npx noninteractive send ${name} "<text>" --wait  # send and wait for response`,
-				);
-				console.log(
-					`  npx noninteractive read ${name} --wait        # wait for new output`,
-				);
-				console.log(
-					`  npx noninteractive stop ${name}               # stop the session`,
-				);
-				return;
+	// auto-suffix if session name is already taken by a live session
+	let suffix = 1;
+	while (true) {
+		const sock = socketPath(name);
+		try {
+			const res = await sendMessage(sock, { action: "read" });
+			if (res.ok) {
+				if (res.exited) {
+					// exited session — stop it and reuse the name
+					try {
+						await sendMessage(sock, { action: "stop" });
+					} catch {}
+					break;
+				}
+				// live session — try next suffix
+				suffix++;
+				name = `${baseName}-${suffix}`;
+				continue;
 			}
-		}
-	} catch {}
+		} catch {}
+		break;
+	}
+	const sock = socketPath(name);
 
 	ensureSessionsDir();
 	try {
