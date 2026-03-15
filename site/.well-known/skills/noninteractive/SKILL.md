@@ -6,7 +6,7 @@ allowed-tools: Bash(npx noninteractive *)
 argument-hint: "<tool> [args...]"
 metadata:
   author: 2027dev
-  version: "1.4"
+  version: "1.5"
 ---
 
 # noninteractive
@@ -58,10 +58,12 @@ Only use `read --wait` when you need to wait for output *without* sending anythi
 ### 1. Start a session
 
 ```bash
-npx noninteractive <tool-name>
+npx noninteractive <tool-name> [args...]
 ```
 
 This runs `npx <tool-name>` in a background PTY. The session name is the tool name (e.g., `npx noninteractive workos` → session `workos`). The start command prints initial output.
+
+**Prefer the simple form.** Pass the tool directly: `npx noninteractive sanity@latest login`, not `npx noninteractive -- npx sanity@latest login`. The session name is derived from the first argument, so using `-- npx` would name the session `npx` instead of `sanity`.
 
 **First run may be slow**: If npx needs to install the package, the first command can take 30-60+ seconds. Use `--timeout 60000` (or higher) on your first `send --wait` or `read --wait`.
 

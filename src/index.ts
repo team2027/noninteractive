@@ -88,11 +88,14 @@ function getSelfCommand(): string[] {
 
 function deriveSessionName(cmd: string, args: string[]): string {
 	const parts = [cmd, ...args];
-	// skip npx/bunx prefix to get the real command name
 	let i = 0;
-	if (parts[i] === "npx" || parts[i] === "bunx") i++;
-	// skip flags like -y, --yes
-	while (i < parts.length && parts[i].startsWith("-")) i++;
+	// skip npx/bunx, flags, and -- separators to find the real tool name
+	while (i < parts.length) {
+		if (parts[i] === "npx" || parts[i] === "bunx") { i++; continue; }
+		if (parts[i] === "--") { i++; continue; }
+		if (parts[i].startsWith("-")) { i++; continue; }
+		break;
+	}
 	const name = parts[i] || cmd;
 	// strip version suffix @latest, @1.2.3, @^5 etc (but not scope prefix @foo/)
 	const stripped = name.replace(/(?<=.)@[^/].*$/, "");
