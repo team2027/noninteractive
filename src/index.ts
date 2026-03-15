@@ -11,15 +11,16 @@ usage: npx noninteractive <tool> [args...]
 
 commands:
   <tool> [args...]                       start a session (runs npx <tool> in a PTY)
-  send  <session> <text> [--wait]        send raw keystrokes (--wait waits for new output)
+  send  <session> <text> [--no-wait]     send keystrokes and return output (--no-wait to fire-and-forget)
   read  <session> [--wait] [--timeout N] read terminal output (--wait blocks until new output)
   stop  <session>                        stop a session
   list                                   show active sessions
   start <cmd> [args...]                  explicit start (for non-npx commands)
 
 flags:
-  --wait, -w         block until new output appears (for send and read)
-  --timeout <ms>     max wait time in ms (default: 30000, used with --wait)
+  --no-wait          fire-and-forget mode for send (don't wait for output)
+  --wait, -w         block until new output appears (for read)
+  --timeout <ms>     max wait time in ms (default: 30000)
   --no-open          don't auto-open URLs in browser (still shown in output)
 
 the session name is auto-derived from the tool (e.g. "workos" → session "workos").
@@ -28,9 +29,9 @@ text is sent exactly as-is — no auto-appended enter. use $'\\r' for Enter, $'\
 
 example workflow:
   npx noninteractive workos                            # starts "npx workos", session = "workos"
-  npx noninteractive send workos $'\\r' --wait          # press Enter, wait for response
-  npx noninteractive send workos $'y\\r' --wait         # type "y" + Enter, wait for response
-  npx noninteractive send workos $'\\x1b[B\\r' --wait   # arrow down + Enter
+  npx noninteractive send workos $'\\r'                 # press Enter, returns output
+  npx noninteractive send workos $'y\\r'                # type "y" + Enter, returns output
+  npx noninteractive send workos $'\\x1b[B\\r'          # arrow down + Enter, returns output
   npx noninteractive read workos --wait                # wait for new output (e.g. OAuth callback)
   npx noninteractive stop workos                       # done, stop the session
 
@@ -210,7 +211,7 @@ async function start(cmdArgs: string[], noOpen = false) {
 						`\n[session '${name}' started — read the output above, then use:]`,
 					);
 					console.log(
-						`  npx noninteractive send ${name} "<text>" --wait  # send and wait for response`,
+						`  npx noninteractive send ${name} "<text>"          # send and get response`,
 					);
 					console.log(
 						`  npx noninteractive read ${name} --wait        # wait for new output`,
@@ -242,7 +243,7 @@ async function start(cmdArgs: string[], noOpen = false) {
 
 	console.log(`[session '${name}' started but no output yet — use:]`);
 	console.log(
-		`  npx noninteractive send ${name} "<text>" --wait  # send and wait for response`,
+		`  npx noninteractive send ${name} "<text>"          # send and get response`,
 	);
 	console.log(
 		`  npx noninteractive read ${name} --wait        # wait for new output`,
@@ -278,6 +279,8 @@ async function send(
 	timeout: number,
 	noOpen = false,
 ) {
+	// empty string "" is a shorthand for pressing Enter — agents naturally try send session ""
+	if (text === "") text = "\r";
 	const sock = socketPath(name);
 	if (wait) {
 		const res = await sendMessage(
@@ -374,11 +377,15 @@ async function main() {
 			const text = positional[1];
 			if (!name || text === undefined) {
 				console.error(
-					'usage: noninteractive send <session> <text> [--wait] [--timeout <ms>]\n\nexample: npx noninteractive send workos "" --wait',
+					'usage: noninteractive send <session> <text> [--no-wait] [--timeout <ms>]\n\nexample: npx noninteractive send workos ""',
 				);
 				process.exit(1);
 			}
+			// send waits by default; --no-wait disables waiting
+			const noWait =
+				sendArgs.includes("--no-wait") || sendArgs.includes("--silent");
 			const wait =
+				!noWait ||
 				cmd === "sendread" ||
 				sendArgs.includes("-w") ||
 				sendArgs.includes("--wait");

@@ -39,36 +39,38 @@ Read the initial output, then drive the session using the workflow below.
 
 ```
 npx noninteractive <tool> [args...]                  # Start a session (runs npx <tool>)
-npx noninteractive send <session> <text> --wait      # Send keystrokes, RETURNS output
+npx noninteractive send <session> <text>             # Send keystrokes, RETURNS output
 npx noninteractive read <session> --wait             # Wait for output without sending
 npx noninteractive stop <session>                    # Stop session
 npx noninteractive list                              # Show active sessions
 ```
 
+Use `--no-wait` with `send` to fire-and-forget (don't wait for output).
+
 ## Critical: `send` sends raw keystrokes
 
-**`send` sends text exactly as-is — no Enter is auto-appended.** You must include `$'\r'` for Enter.
+**`send` sends text exactly as-is — no Enter is auto-appended.** You must include `$'\r'` for Enter. Shorthand: `send session ""` sends Enter (empty string `""` is auto-converted to `\r`).
 
 ```bash
 # Press Enter
-npx noninteractive send <session> $'\r' --wait
+npx noninteractive send <session> $'\r'
 
 # Type text + Enter
-npx noninteractive send <session> $'my-project-name\r' --wait
+npx noninteractive send <session> $'my-project-name\r'
 
 # Type 'y' + Enter
-npx noninteractive send <session> $'y\r' --wait
+npx noninteractive send <session> $'y\r'
 
 # Arrow down (no Enter — just navigates)
-npx noninteractive send <session> $'\x1b[B' --wait
+npx noninteractive send <session> $'\x1b[B'
 
 # Arrow down twice, then Enter to confirm
-npx noninteractive send <session> $'\x1b[B\x1b[B\r' --wait
+npx noninteractive send <session> $'\x1b[B\x1b[B\r'
 ```
 
-**`send --wait` returns the full terminal output.** You do NOT need to call `read` after `send --wait`.
+**`send` returns the full terminal output by default.** You do NOT need to call `read` after `send`.
 
-The correct workflow is: **start → send --wait → send --wait → ... → stop**
+The correct workflow is: **start → send → send → ... → stop**
 
 Only use `read --wait` when you need to wait for output *without* sending anything (e.g., waiting for an OAuth callback).
 
@@ -99,25 +101,25 @@ This runs `npx <tool-name>` in a background PTY. The session name is the tool na
 
 **Prefer the simple form.** Pass the tool directly: `npx noninteractive sanity@latest login`, not `npx noninteractive -- npx sanity@latest login`. The session name is derived from the first argument, so using `-- npx` would name the session `npx` instead of `sanity`.
 
-**First run may be slow**: If npx needs to install the package, the first command can take 30-60+ seconds. Use `--timeout 60000` (or higher) on your first `send --wait` or `read --wait`.
+**First run may be slow**: If npx needs to install the package, the first command can take 30-60+ seconds. Use `--timeout 60000` (or higher) on your first `send` or `read --wait`.
 
 ### 2. Send input and get response
 
 ```bash
 # Press Enter (confirm/select current option), get response
-npx noninteractive send <session> $'\r' --wait
+npx noninteractive send <session> $'\r'
 
 # Type text and press Enter, get response
-npx noninteractive send <session> $'my-project-name\r' --wait
+npx noninteractive send <session> $'my-project-name\r'
 
 # Navigate down two options, then confirm
-npx noninteractive send <session> $'\x1b[B\x1b[B\r' --wait
+npx noninteractive send <session> $'\x1b[B\x1b[B\r'
 
 # Just navigate without confirming
-npx noninteractive send <session> $'\x1b[B' --wait
+npx noninteractive send <session> $'\x1b[B'
 ```
 
-**Do not call `read` after `send --wait`** — the output is already in the response.
+**Do not call `read` after `send`** — the output is already in the response.
 
 ### 3. Wait without sending (OAuth flows, long operations)
 
