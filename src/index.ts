@@ -11,7 +11,7 @@ usage: npx noninteractive <tool> [args...]
 
 commands:
   <tool> [args...]                       start a session (runs npx <tool> in a PTY)
-  send  <session> <text> [--wait]        send keystrokes (--wait waits for new output)
+  send  <session> <text> [--wait]        send raw keystrokes (--wait waits for new output)
   read  <session> [--wait] [--timeout N] read terminal output (--wait blocks until new output)
   stop  <session>                        stop a session
   list                                   show active sessions
@@ -24,12 +24,15 @@ flags:
 
 the session name is auto-derived from the tool (e.g. "workos" → session "workos").
 
-example workflow (recommended — uses --wait to minimize round-trips):
-  npx noninteractive workos                    # starts "npx workos", session = "workos"
-  npx noninteractive send workos "" --wait     # press Enter, wait for response
-  npx noninteractive send workos "y" --wait    # type "y", wait for response
-  npx noninteractive read workos --wait        # wait for new output (e.g. OAuth callback)
-  npx noninteractive stop workos               # done, stop the session
+text is sent exactly as-is — no auto-appended enter. use $'\\r' for Enter, $'\\x1b[B' for arrow keys.
+
+example workflow:
+  npx noninteractive workos                            # starts "npx workos", session = "workos"
+  npx noninteractive send workos $'\\r' --wait          # press Enter, wait for response
+  npx noninteractive send workos $'y\\r' --wait         # type "y" + Enter, wait for response
+  npx noninteractive send workos $'\\x1b[B\\r' --wait   # arrow down + Enter
+  npx noninteractive read workos --wait                # wait for new output (e.g. OAuth callback)
+  npx noninteractive stop workos                       # done, stop the session
 
 more examples:
   npx noninteractive vercel                 # session "vercel"

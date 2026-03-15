@@ -259,7 +259,7 @@ export function runDaemon(
 					socket.end(JSON.stringify({ ok: false, error: "process exited" }));
 					break;
 				}
-				stdin?.write(`${msg.data}\r`);
+				stdin?.write(msg.data);
 				socket.end(JSON.stringify({ ok: true }));
 				break;
 
@@ -270,7 +270,7 @@ export function runDaemon(
 				}
 				const beforeLength = outputBuffer.length;
 				const timeout = msg.timeout ?? 30000;
-				stdin?.write(`${msg.data}\r`);
+				stdin?.write(msg.data);
 				waitForNewOutput(socket, beforeLength, timeout);
 				break;
 			}
