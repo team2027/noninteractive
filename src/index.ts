@@ -42,11 +42,15 @@ more examples:
 
 const stripAnsi = (s: string) =>
 	s
+		// erase-line sequences → newline (preserves structure when prompts re-render)
+		.replace(/\x1b\[[012]?K/g, "\n")
+		// strip all other ANSI escape sequences
 		.replace(
 			/\x1b\[[\x20-\x3f]*[\x40-\x7e]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][A-Z0-9]|\x1b[\x20-\x2f]*[\x30-\x7e]|\x07/g,
 			"",
 		)
-		.replace(/\r\n?/g, "\n");
+		.replace(/\r\n?/g, "\n")
+		.replace(/\n{3,}/g, "\n\n");
 
 const seenUrls = new Set<string>();
 
