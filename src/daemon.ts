@@ -114,13 +114,23 @@ export function runDaemon(
 	};
 	const waiters: Waiter[] = [];
 
+	let notifyDebounce: ReturnType<typeof setTimeout> | null = null;
+	const NOTIFY_SETTLE_MS = 50;
+
 	function notifyWaiters() {
-		let w = waiters.shift();
-		while (w) {
-			clearTimeout(w.timer);
-			w.resolve(outputBuffer);
-			w = waiters.shift();
-		}
+		if (waiters.length === 0) return;
+		// debounce: wait a short time for more output to arrive before resolving
+		// this prevents resolving on partial output (e.g. PTY echo before the real response)
+		if (notifyDebounce) clearTimeout(notifyDebounce);
+		notifyDebounce = setTimeout(() => {
+			notifyDebounce = null;
+			let w = waiters.shift();
+			while (w) {
+				clearTimeout(w.timer);
+				w.resolve(outputBuffer);
+				w = waiters.shift();
+			}
+		}, NOTIFY_SETTLE_MS);
 	}
 
 	const binDir = sessionBinDir(sessionName);
@@ -175,7 +185,15 @@ export function runDaemon(
 		processExited = true;
 		exitCode = code;
 		outputBuffer += `\n[exited ${code}]`;
-		notifyWaiters();
+		// flush immediately on exit — no need to debounce
+		if (notifyDebounce) clearTimeout(notifyDebounce);
+		notifyDebounce = null;
+		let w = waiters.shift();
+		while (w) {
+			clearTimeout(w.timer);
+			w.resolve(outputBuffer);
+			w = waiters.shift();
+		}
 
 		setTimeout(() => {
 			server.close();
