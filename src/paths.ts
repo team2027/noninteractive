@@ -23,3 +23,7 @@ export function sessionBinDir(name: string) {
 export function sessionUrlsFile(name: string) {
 	return resolve(SESSIONS_DIR, name, "urls");
 }
+
+export function sessionOutputFile(name: string) {
+	return resolve(SESSIONS_DIR, `${name}.output`);
+}

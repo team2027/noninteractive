@@ -14,6 +14,7 @@ import {
 	ensureSessionsDir,
 	sessionBinDir,
 	sessionDir,
+	sessionOutputFile,
 	sessionUrlsFile,
 	socketPath,
 } from "./paths";
@@ -185,6 +186,10 @@ export function runDaemon(
 		processExited = true;
 		exitCode = code;
 		outputBuffer += `\n[exited ${code}]`;
+		// persist output so reads work after daemon shuts down
+		try {
+			writeFileSync(sessionOutputFile(sessionName), outputBuffer);
+		} catch {}
 		// flush immediately on exit — no need to debounce
 		if (notifyDebounce) clearTimeout(notifyDebounce);
 		notifyDebounce = null;
@@ -294,6 +299,10 @@ export function runDaemon(
 			}
 
 			case "stop":
+				// persist output before shutdown
+				try {
+					writeFileSync(sessionOutputFile(sessionName), outputBuffer);
+				} catch {}
 				proc.kill("SIGTERM");
 				socket.end(JSON.stringify({ ok: true }));
 				setTimeout(() => {

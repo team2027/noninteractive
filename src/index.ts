@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 
 import { execSync, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { type DaemonResponse, sendMessage } from "./client";
-import { ensureSessionsDir, socketPath } from "./paths";
+import { ensureSessionsDir, sessionOutputFile, socketPath } from "./paths";
 
 const HELP = `noninteractive — run interactive CLI commands non-interactively.
 
@@ -272,10 +272,23 @@ async function read(
 		msg.timeout = timeout;
 	}
 	const clientTimeout = wait ? timeout + 5000 : 5000;
-	const res = await sendMessage(sock, msg, clientTimeout);
-	if (res.output !== undefined) process.stdout.write(stripAnsi(res.output));
-	handleUrls(res, noOpen);
-	if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
+	try {
+		const res = await sendMessage(sock, msg, clientTimeout);
+		if (res.output !== undefined) process.stdout.write(stripAnsi(res.output));
+		handleUrls(res, noOpen);
+		if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
+	} catch {
+		// daemon gone — try persisted output file
+		const outputFile = sessionOutputFile(name);
+		if (existsSync(outputFile)) {
+			const output = readFileSync(outputFile, "utf-8");
+			process.stdout.write(stripAnsi(output));
+			console.log(`\n[session exited]`);
+		} else {
+			console.error(`session '${name}' not found`);
+			process.exit(1);
+		}
+	}
 }
 
 async function send(
@@ -293,20 +306,33 @@ async function send(
 		.replace(/\\n/g, "\n")
 		.replace(/\\t/g, "\t");
 	const sock = socketPath(name);
-	if (wait) {
-		const res = await sendMessage(
-			sock,
-			{ action: "sendread", data: text, timeout },
-			timeout + 5000,
-		);
-		if (res.output !== undefined) process.stdout.write(stripAnsi(res.output));
-		handleUrls(res, noOpen);
-		if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
-	} else {
-		await sendMessage(sock, { action: "send", data: text });
-		console.log(
-			`[sent to '${name}' — run "npx noninteractive read ${name}" to see the result]`,
-		);
+	try {
+		if (wait) {
+			const res = await sendMessage(
+				sock,
+				{ action: "sendread", data: text, timeout },
+				timeout + 5000,
+			);
+			if (res.output !== undefined) process.stdout.write(stripAnsi(res.output));
+			handleUrls(res, noOpen);
+			if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
+		} else {
+			await sendMessage(sock, { action: "send", data: text });
+			console.log(
+				`[sent to '${name}' — run "npx noninteractive read ${name}" to see the result]`,
+			);
+		}
+	} catch {
+		// daemon gone — try persisted output file
+		const outputFile = sessionOutputFile(name);
+		if (existsSync(outputFile)) {
+			const output = readFileSync(outputFile, "utf-8");
+			process.stdout.write(stripAnsi(output));
+			console.log(`\n[session exited]`);
+		} else {
+			console.error(`session '${name}' not found`);
+			process.exit(1);
+		}
 	}
 }
 
