@@ -6,7 +6,7 @@ allowed-tools: Bash(npx noninteractive *)
 argument-hint: "<tool> [args...]"
 metadata:
   author: 2027dev
-  version: "1.6"
+  version: "1.7"
 ---
 
 # noninteractive
@@ -47,25 +47,28 @@ npx noninteractive list                              # Show active sessions
 
 Use `--no-wait` with `send` to fire-and-forget (don't wait for output).
 
-## Critical: `send` sends raw keystrokes
+## Critical: `send` parses escape sequences
 
-**`send` sends text exactly as-is — no Enter is auto-appended.** You must include `$'\r'` for Enter. Shorthand: `send session ""` sends Enter (empty string `""` is auto-converted to `\r`).
+**`send` parses C-style escape sequences in the text argument.** Use regular double quotes — no shell `$'...'` quoting needed.
 
 ```bash
-# Press Enter
-npx noninteractive send <session> $'\r'
+# Press Enter (empty string = Enter)
+npx noninteractive send <session> ""
+
+# Press Enter (explicit)
+npx noninteractive send <session> "\r"
 
 # Type text + Enter
-npx noninteractive send <session> $'my-project-name\r'
+npx noninteractive send <session> "my-project-name\r"
 
 # Type 'y' + Enter
-npx noninteractive send <session> $'y\r'
+npx noninteractive send <session> "y\r"
 
 # Arrow down (no Enter — just navigates)
-npx noninteractive send <session> $'\x1b[B'
+npx noninteractive send <session> "\x1b[B"
 
 # Arrow down twice, then Enter to confirm
-npx noninteractive send <session> $'\x1b[B\x1b[B\r'
+npx noninteractive send <session> "\x1b[B\x1b[B\r"
 ```
 
 **`send` returns the full terminal output by default.** You do NOT need to call `read` after `send`.
@@ -77,17 +80,18 @@ Only use `read --wait` when you need to wait for output *without* sending anythi
 ## Special keys reference
 
 ```
-$'\r'       Enter / Return
-$'\x1b[A'   Arrow Up
-$'\x1b[B'   Arrow Down
-$'\x1b[C'   Arrow Right
-$'\x1b[D'   Arrow Left
-$'\t'       Tab
-$'\x1b'     Escape
-$'\x7f'     Backspace
+""          Enter (shorthand — empty string auto-converts to \r)
+"\r"        Enter / Return
+"\x1b[A"    Arrow Up
+"\x1b[B"    Arrow Down
+"\x1b[C"    Arrow Right
+"\x1b[D"    Arrow Left
+"\t"        Tab
+"\x1b"      Escape
+"\x7f"      Backspace
 ```
 
-You can combine multiple keys in one send: `$'\x1b[B\x1b[B\r'` = down, down, enter.
+You can combine multiple keys in one send: `"\x1b[B\x1b[B\r"` = down, down, enter.
 
 ## Step-by-step workflow
 
@@ -107,16 +111,16 @@ This runs `npx <tool-name>` in a background PTY. The session name is the tool na
 
 ```bash
 # Press Enter (confirm/select current option), get response
-npx noninteractive send <session> $'\r'
+npx noninteractive send <session> ""
 
 # Type text and press Enter, get response
-npx noninteractive send <session> $'my-project-name\r'
+npx noninteractive send <session> "my-project-name\r"
 
 # Navigate down two options, then confirm
-npx noninteractive send <session> $'\x1b[B\x1b[B\r'
+npx noninteractive send <session> "\x1b[B\x1b[B\r"
 
 # Just navigate without confirming
-npx noninteractive send <session> $'\x1b[B'
+npx noninteractive send <session> "\x1b[B" --no-wait
 ```
 
 **Do not call `read` after `send`** — the output is already in the response.
@@ -143,14 +147,14 @@ npx noninteractive workos
 # Output: ◆  Run the AuthKit installer?  │  ● Yes / ○ No  └
 
 # Press Enter to select "Yes" — response includes next prompt
-npx noninteractive send workos $'\r'
+npx noninteractive send workos ""
 # Output: ◆  You are on main. Create a feature branch?  │  ● Create feat/add-workos-authkit  └
 
 # Press Enter to confirm — response includes next prompt
-npx noninteractive send workos $'\r'
+npx noninteractive send workos ""
 
 # Type API key + Enter — response includes next prompt
-npx noninteractive send workos $'my-api-key\r'
+npx noninteractive send workos "my-api-key\r"
 
 # Done
 npx noninteractive stop workos
@@ -159,7 +163,8 @@ npx noninteractive stop workos
 ## Important details
 
 - **`send` returns output by default**: Do not follow it with `read`. The output is already there. Use `--no-wait` to fire-and-forget.
-- **No auto-Enter**: `send` sends text exactly as-is. Include `$'\r'` when you want to press Enter.
+- **Escape sequences are parsed**: `\r` = Enter, `\x1b[B` = arrow down, etc. Use regular double quotes, not `$'...'`.
+- **Empty string = Enter**: `send session ""` is the easiest way to press Enter.
 - **ANSI codes stripped**: Output is clean text — no escape sequences to parse.
 - **First run timeout**: npx may need to install the package. Use `--timeout 60000` or higher on the first wait.
 - **Output accumulates**: Output contains ALL text since session start. Look at the end for the latest prompt.
@@ -173,14 +178,23 @@ npx noninteractive stop workos
 
 ### Arrow key navigation
 
-Use escape sequences to navigate menus. Arrow keys alone do NOT confirm — send `$'\r'` separately to confirm.
+Use escape sequences to navigate menus. Arrow keys alone do NOT confirm — send `"\r"` separately or combine: `"\x1b[B\r"`.
 
 ```bash
 # Move down and confirm
-npx noninteractive send <session> $'\x1b[B\r'
+npx noninteractive send <session> "\x1b[B\r"
 
 # Move down twice without confirming
-npx noninteractive send <session> $'\x1b[B\x1b[B'
+npx noninteractive send <session> "\x1b[B\x1b[B" --no-wait
+```
+
+### Yes/No toggle prompts
+
+Most Yes/No toggles default to the correct option. **Just press Enter** — don't send arrow keys unless you need to change the selection.
+
+```bash
+# Accept the default (usually Yes)
+npx noninteractive send <session> ""
 ```
 
 ### OAuth/browser flows
