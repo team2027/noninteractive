@@ -25,13 +25,15 @@ flags:
 
 the session name is auto-derived from the tool (e.g. "workos" → session "workos").
 
-text is sent exactly as-is — no auto-appended enter. use $'\\r' for Enter, $'\\x1b[B' for arrow keys.
+text is sent raw — no auto-appended enter. escape sequences are parsed:
+  \\r = Enter, \\n = newline, \\t = tab, \\x1b = escape (for arrow keys)
 
 example workflow:
   npx noninteractive workos                            # starts "npx workos", session = "workos"
-  npx noninteractive send workos $'\\r'                 # press Enter, returns output
-  npx noninteractive send workos $'y\\r'                # type "y" + Enter, returns output
-  npx noninteractive send workos $'\\x1b[B\\r'          # arrow down + Enter, returns output
+  npx noninteractive send workos ""                    # press Enter (empty string = Enter)
+  npx noninteractive send workos "y\\r"                 # type "y" + Enter
+  npx noninteractive send workos "\\x1b[B\\r"           # arrow down + Enter
+  npx noninteractive send workos "\\x1b[B"             # arrow down (no Enter)
   npx noninteractive read workos --wait                # wait for new output (e.g. OAuth callback)
   npx noninteractive stop workos                       # done, stop the session
 
@@ -283,8 +285,13 @@ async function send(
 	timeout: number,
 	noOpen = false,
 ) {
-	// empty string "" is a shorthand for pressing Enter — agents naturally try send session ""
+	// empty string "" is a shorthand for pressing Enter
 	if (text === "") text = "\r";
+	// parse C-style escape sequences so agents don't need shell $'...' quoting
+	text = text.replace(/\\x([0-9a-fA-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+		.replace(/\\r/g, "\r")
+		.replace(/\\n/g, "\n")
+		.replace(/\\t/g, "\t");
 	const sock = socketPath(name);
 	if (wait) {
 		const res = await sendMessage(
