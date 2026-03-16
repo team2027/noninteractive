@@ -136,8 +136,10 @@ export function runDaemon(
 
 	const binDir = sessionBinDir(sessionName);
 	const ptyBridge = getPtyBridge();
+	const spawnCwd = process.env.NI_CWD || process.cwd();
 	const proc = spawn(ptyBridge, [executable, ...args], {
 		stdio: ["pipe", "pipe", "pipe"],
+		cwd: spawnCwd,
 		env: {
 			...process.env,
 			TERM: "xterm-256color",

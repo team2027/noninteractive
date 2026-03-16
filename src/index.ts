@@ -15,15 +15,18 @@ commands:
   read  <session> [--wait] [--timeout N] read terminal output (--wait blocks until new output)
   stop  <session>                        stop a session
   list                                   show active sessions
-  start <cmd> [args...]                  explicit start (for non-npx commands)
+  start [--name N] [--cwd D] <cmd> [args...]  explicit start (for non-npx commands)
 
 flags:
+  --name <session>   set session name (default: auto-derived from tool name)
+  --cwd <dir>        set working directory for the command
   --no-wait          fire-and-forget mode for send (don't wait for output)
   --wait, -w         block until new output appears (for read)
   --timeout <ms>     max wait time in ms (default: 30000)
   --no-open          don't auto-open URLs in browser (still shown in output)
 
 the session name is auto-derived from the tool (e.g. "workos" → session "workos").
+use --name to override, --cwd to set the working directory.
 
 text is sent raw — no auto-appended enter. escape sequences are parsed:
   \\r = Enter, \\n = newline, \\t = tab, \\x1b = escape (for arrow keys)
@@ -186,10 +189,15 @@ function deriveSessionName(cmd: string, args: string[]): string {
 		.replace(/[^a-zA-Z0-9_-]/g, "");
 }
 
-async function start(cmdArgs: string[], noOpen = false) {
+async function start(
+	cmdArgs: string[],
+	noOpen = false,
+	sessionName?: string,
+	cwd?: string,
+) {
 	const executable = cmdArgs[0];
 	const args = cmdArgs.slice(1);
-	const baseName = deriveSessionName(executable, args);
+	const baseName = sessionName || deriveSessionName(executable, args);
 	let name = baseName;
 
 	// auto-suffix if session name is already taken by a live session
@@ -229,6 +237,7 @@ async function start(cmdArgs: string[], noOpen = false) {
 		{
 			detached: true,
 			stdio: "ignore",
+			...(cwd ? { env: { ...process.env, NI_CWD: cwd } } : {}),
 		},
 	);
 	child.unref();
@@ -441,15 +450,31 @@ async function main() {
 
 	switch (cmd) {
 		case "start": {
-			const startArgs = args.slice(1).filter((a) => a !== "--no-open");
-			const noOpen = args.includes("--no-open");
-			if (startArgs.length < 1) {
+			const startArgs = args.slice(1);
+			const noOpen = startArgs.includes("--no-open");
+			// parse --name and --cwd flags
+			let sessionName: string | undefined;
+			let cwd: string | undefined;
+			const nameIdx = startArgs.indexOf("--name");
+			if (nameIdx !== -1) {
+				sessionName = startArgs[nameIdx + 1];
+				startArgs.splice(nameIdx, 2);
+			}
+			const cwdIdx = startArgs.indexOf("--cwd");
+			if (cwdIdx !== -1) {
+				cwd = startArgs[cwdIdx + 1];
+				startArgs.splice(cwdIdx, 2);
+			}
+			const filtered = startArgs.filter(
+				(a) => a !== "--no-open",
+			);
+			if (filtered.length < 1) {
 				console.error(
-					"usage: noninteractive start <cmd> [args...]\n\nexamples:\n  npx noninteractive start npx eslint --init\n  npx noninteractive eslint --init          # shorthand (auto-starts with npx)",
+					"usage: noninteractive start [--name <session>] [--cwd <dir>] <cmd> [args...]\n\nexamples:\n  npx noninteractive start npx eslint --init\n  npx noninteractive start --name myeslint --cwd /tmp/project npx eslint --init",
 				);
 				process.exit(1);
 			}
-			return start(startArgs, noOpen);
+			return start(filtered, noOpen, sessionName, cwd);
 		}
 		case "read": {
 			const readArgs = args.slice(1);
@@ -520,28 +545,38 @@ async function main() {
 			console.log(HELP);
 			break;
 		default: {
-			// detect common wrong flags before the tool name (meant for noninteractive, not the target)
-			// flags AFTER the tool name belong to the target command and are passed through
-			const niFlags = ["--name", "--cwd", "--dir", "--session"];
-			const firstPositional = args.findIndex((a) => !a.startsWith("-") && a !== "--");
-			const flagsBefore = firstPositional === -1 ? args : args.slice(0, firstPositional);
-			const wrongFlag = flagsBefore.find((a) => niFlags.includes(a.split("=")[0]));
+			// parse --name and --cwd flags before the tool name
+			let sessionName: string | undefined;
+			let cwd: string | undefined;
+			const mutableArgs = [...args];
+			const nameIdx = mutableArgs.indexOf("--name");
+			if (nameIdx !== -1) {
+				sessionName = mutableArgs[nameIdx + 1];
+				mutableArgs.splice(nameIdx, 2);
+			}
+			const cwdIdx = mutableArgs.indexOf("--cwd");
+			if (cwdIdx !== -1) {
+				cwd = mutableArgs[cwdIdx + 1];
+				mutableArgs.splice(cwdIdx, 2);
+			}
+
+			// detect remaining wrong flags before the tool name
+			const wrongFlags = ["--dir", "--session"];
+			const firstPositional = mutableArgs.findIndex((a) => !a.startsWith("-") && a !== "--");
+			const flagsBefore = firstPositional === -1 ? mutableArgs : mutableArgs.slice(0, firstPositional);
+			const wrongFlag = flagsBefore.find((a) => wrongFlags.includes(a.split("=")[0]));
 			if (wrongFlag) {
 				console.error(
-					`unknown flag: ${wrongFlag}\n\nhint: ${wrongFlag} is not supported. the session name is auto-derived from the command.`,
-				);
-				console.error(
-					`\nexamples:\n  npx noninteractive eslint --init          # auto-start, session = "eslint"\n  npx noninteractive start npx eslint --init # explicit start`,
+					`unknown flag: ${wrongFlag}\n\nhint: use --name for session name, --cwd for working directory.`,
 				);
 				process.exit(1);
 			}
 
 			// treat unknown commands as: start npx --yes <args>
-			// --yes auto-accepts package installs so the session doesn't hang on a prompt
-			const noOpen = args.includes("--no-open");
-			const filteredArgs = args.filter((a) => a !== "--no-open");
+			const noOpen = mutableArgs.includes("--no-open");
+			const filteredArgs = mutableArgs.filter((a) => a !== "--no-open");
 			console.log(`[installing and running: npx ${filteredArgs.join(" ")}]`);
-			return start(["npx", "--yes", ...filteredArgs], noOpen);
+			return start(["npx", "--yes", ...filteredArgs], noOpen, sessionName, cwd);
 		}
 	}
 }
