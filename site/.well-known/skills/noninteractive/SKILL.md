@@ -93,6 +93,8 @@ Only use `read --wait` when you need to wait for output *without* sending anythi
 
 You can combine multiple keys in one send: `"\x1b[B\x1b[B\r"` = down, down, enter.
 
+Many CLI prompts (@clack/prompts, inquirer) also accept **vim keys**: `j` = down, `k` = up, `h` = left, `l` = right. These are more reliable than arrow escape sequences in PTY contexts.
+
 ## Step-by-step workflow
 
 ### 1. Start a session
@@ -195,7 +197,14 @@ Most Yes/No toggles default to the correct option. **Just press Enter** — don'
 ```bash
 # Accept the default (usually Yes)
 npx noninteractive send <session> ""
+
+# Switch selection: use vim keys (more reliable than arrow keys in PTY)
+npx noninteractive send <session> "l" --no-wait   # move right (No → Yes)
+npx noninteractive send <session> "h" --no-wait   # move left (Yes → No)
+npx noninteractive send <session> ""               # then confirm with Enter
 ```
+
+The `◉` symbol in output means "selected", `◯` means "not selected".
 
 ### OAuth/browser flows
 URLs detected in output are automatically opened in the user's browser. The CLI intercepts `open`/`xdg-open` calls and scans output for URLs.
