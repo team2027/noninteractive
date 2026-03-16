@@ -42,17 +42,79 @@ more examples:
   npx noninteractive supabase init          # session "supabase"
   npx noninteractive start vercel login     # explicit start for non-npx commands`;
 
-const stripAnsi = (s: string) =>
-	s
-		// erase-line sequences → newline (preserves structure when prompts re-render)
-		.replace(/\x1b\[[012]?K/g, "\n")
-		// strip all other ANSI escape sequences
-		.replace(
-			/\x1b\[[\x20-\x3f]*[\x40-\x7e]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][A-Z0-9]|\x1b[\x20-\x2f]*[\x30-\x7e]|\x07/g,
-			"",
-		)
+function stripAnsi(s: string): string {
+	// step 1: erase-line → newline
+	s = s.replace(/\x1b\[[012]?K/g, "\n");
+
+	// step 2: convert bold/underline/inverse to **...** markers
+	// stateful pass: track open spans, emit markers on close
+	let result = "";
+	let bold = false;
+	let boldBuf = "";
+	let i = 0;
+	while (i < s.length) {
+		// match any SGR sequence: \x1b[ ... m
+		if (s[i] === "\x1b" && s[i + 1] === "[") {
+			const end = s.indexOf("m", i + 2);
+			if (end !== -1 && end - i < 16 && /^[\d;]*$/.test(s.slice(i + 2, end))) {
+				const codes = s.slice(i + 2, end).split(";").map(Number);
+				for (const code of codes) {
+					if (code === 1 || code === 4 || code === 7) {
+						// bold, underline, or inverse ON
+						if (!bold) {
+							bold = true;
+							boldBuf = "";
+						}
+					} else if (code === 0 || code === 22 || code === 24 || code === 27) {
+						// reset / bold off / underline off / inverse off
+						if (bold && boldBuf.trim()) {
+							result += `**${boldBuf}**`;
+						} else if (bold) {
+							result += boldBuf;
+						}
+						bold = false;
+						boldBuf = "";
+					}
+				}
+				i = end + 1;
+				continue;
+			}
+		}
+		// match any other escape sequence (non-SGR) — strip it
+		if (s[i] === "\x1b") {
+			if (s[i + 1] === "[") {
+				const end = s.slice(i + 2).search(/[\x40-\x7e]/);
+				if (end !== -1) { i += end + 3; continue; }
+			} else if (s[i + 1] === "]") {
+				const end = s.indexOf("\x07", i);
+				if (end !== -1) { i = end + 1; continue; }
+				const end2 = s.indexOf("\x1b\\", i);
+				if (end2 !== -1) { i = end2 + 2; continue; }
+			} else if (s[i + 1] === "(" || s[i + 1] === ")") {
+				i += 3; continue;
+			} else {
+				i += 2; continue;
+			}
+		}
+		if (s[i] === "\x07") { i++; continue; }
+		if (bold) {
+			boldBuf += s[i];
+		} else {
+			result += s[i];
+		}
+		i++;
+	}
+	// flush any remaining bold buffer
+	if (bold && boldBuf.trim()) {
+		result += `**${boldBuf}**`;
+	} else if (bold) {
+		result += boldBuf;
+	}
+
+	return result
 		.replace(/\r\n?/g, "\n")
 		.replace(/\n{3,}/g, "\n\n");
+}
 
 const seenUrls = new Set<string>();
 
