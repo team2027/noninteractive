@@ -445,7 +445,7 @@ async function main() {
 			const noOpen = args.includes("--no-open");
 			if (startArgs.length < 1) {
 				console.error(
-					"usage: noninteractive start <cmd> [args...]\n\nexample: npx noninteractive start npx vercel",
+					"usage: noninteractive start <cmd> [args...]\n\nexamples:\n  npx noninteractive start npx eslint --init\n  npx noninteractive eslint --init          # shorthand (auto-starts with npx)",
 				);
 				process.exit(1);
 			}
@@ -520,6 +520,22 @@ async function main() {
 			console.log(HELP);
 			break;
 		default: {
+			// detect common wrong flags before the tool name (meant for noninteractive, not the target)
+			// flags AFTER the tool name belong to the target command and are passed through
+			const niFlags = ["--name", "--cwd", "--dir", "--session"];
+			const firstPositional = args.findIndex((a) => !a.startsWith("-") && a !== "--");
+			const flagsBefore = firstPositional === -1 ? args : args.slice(0, firstPositional);
+			const wrongFlag = flagsBefore.find((a) => niFlags.includes(a.split("=")[0]));
+			if (wrongFlag) {
+				console.error(
+					`unknown flag: ${wrongFlag}\n\nhint: ${wrongFlag} is not supported. the session name is auto-derived from the command.`,
+				);
+				console.error(
+					`\nexamples:\n  npx noninteractive eslint --init          # auto-start, session = "eslint"\n  npx noninteractive start npx eslint --init # explicit start`,
+				);
+				process.exit(1);
+			}
+
 			// treat unknown commands as: start npx --yes <args>
 			// --yes auto-accepts package installs so the session doesn't hang on a prompt
 			const noOpen = args.includes("--no-open");
