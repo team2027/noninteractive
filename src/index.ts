@@ -498,6 +498,11 @@ async function main() {
 				cwd = startArgs[cwdIdx + 1];
 				startArgs.splice(cwdIdx, 2);
 			}
+			if (startArgs.includes("--")) {
+				console.error(
+					`hint: the -- separator is not needed. just put the command after the flags.`,
+				);
+			}
 			const filtered = startArgs.filter((a) => a !== "--no-open" && a !== "--");
 			if (filtered.includes("--help") || filtered.includes("-h")) {
 				console.log(`usage: noninteractive start [--name <session>] [--cwd <dir>] <cmd> [args...]
@@ -624,6 +629,11 @@ flags:
 			}
 
 			// treat unknown commands as: start npx --yes <args>
+			if (mutableArgs.includes("--")) {
+				console.error(
+					`hint: the -- separator is not needed. just put the command after the flags.`,
+				);
+			}
 			const noOpen = mutableArgs.includes("--no-open");
 			const filteredArgs = mutableArgs.filter(
 				(a) => a !== "--no-open" && a !== "--",
