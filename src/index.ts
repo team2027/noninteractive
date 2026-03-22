@@ -222,16 +222,16 @@ async function start(
 	const baseName = sessionName || deriveSessionName(executable, args);
 	const name = baseName;
 
-	// check if session name is already taken
+	// check if session name is already taken (short timeout to avoid hanging on stale sockets)
 	{
 		const sock = socketPath(name);
 		try {
-			const res = await sendMessage(sock, { action: "read" });
+			const res = await sendMessage(sock, { action: "read" }, 2000);
 			if (res.ok) {
 				if (res.exited) {
 					// exited session — stop it and reuse the name
 					try {
-						await sendMessage(sock, { action: "stop" });
+						await sendMessage(sock, { action: "stop" }, 2000);
 					} catch {}
 				} else {
 					// live session — error out
@@ -242,7 +242,13 @@ async function start(
 					process.exit(1);
 				}
 			}
-		} catch {}
+		} catch {
+			// stale socket — clean it up
+			try {
+				const { unlinkSync } = await import("node:fs");
+				unlinkSync(sock);
+			} catch {}
+		}
 	}
 	const sock = socketPath(name);
 
@@ -296,18 +302,20 @@ async function start(
 			if (clean.length > 10) {
 				process.stdout.write(stripAnsi(res.output));
 				if (res.exited) {
-					console.log(
-						`\n[session '${name}' exited ${res.exitCode} — the command failed]`,
-					);
-					console.log(
-						`hint: the first argument to "start" is the command to run, NOT a session name.`,
-					);
-					console.log(
-						`  npx noninteractive start npx vercel        # run an npx package`,
-					);
-					console.log(
-						`  npx noninteractive start vercel login       # run a command directly`,
-					);
+					console.log(`\n[session '${name}' exited ${res.exitCode}]`);
+					// only show "not a session name" hint if exit was very fast with minimal output
+					// (suggests command not found, not a legitimate run that failed)
+					if (clean.length < 100 && i < 10) {
+						console.log(
+							`hint: the first argument to "start" is the command to run, NOT a session name.`,
+						);
+						console.log(
+							`  npx noninteractive start npx vercel        # run an npx package`,
+						);
+						console.log(
+							`  npx noninteractive start vercel login       # run a command directly`,
+						);
+					}
 				} else {
 					console.log(
 						`\n[session '${name}' started — the first prompt is shown above. use:]`,
@@ -326,12 +334,12 @@ async function start(
 			}
 			if (res.exited) {
 				process.stdout.write(stripAnsi(res.output ?? ""));
-				console.log(
-					`\n[session '${name}' exited ${res.exitCode} — the command failed]`,
-				);
-				console.log(
-					`hint: the first argument to "start" is the command to run, NOT a session name.`,
-				);
+				console.log(`\n[session '${name}' exited ${res.exitCode}]`);
+				if (i < 10) {
+					console.log(
+						`hint: the first argument to "start" is the command to run, NOT a session name.`,
+					);
+				}
 				console.log(
 					`  npx noninteractive start npx vercel        # run an npx package`,
 				);
