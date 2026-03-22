@@ -46,6 +46,13 @@ more examples:
   npx noninteractive start vercel login     # explicit start for non-npx commands`;
 
 function stripAnsi(s: string): string {
+	// step 0: screen-clear — only keep content after the last clear screen
+	const lastClear = Math.max(
+		s.lastIndexOf("\x1b[2J"),
+		s.lastIndexOf("\x1b[H\x1b[2J"),
+	);
+	if (lastClear !== -1) s = s.slice(lastClear);
+
 	// step 1: erase-line → newline
 	s = s.replace(/\x1b\[[012]?K/g, "\n");
 
@@ -261,13 +268,16 @@ async function start(
 		process.exit(1);
 	}
 
-	// poll until we get meaningful output (up to 10s)
-	for (let i = 0; i < 50; i++) {
+	// poll until we get meaningful output (up to 30s)
+	// spinner chars (braille dots) don't count — wait for real content
+	const stripSpinners = (s: string) =>
+		s.replace(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠛⠳⠞⠽⠻⠿⠾⠷⠯⠟]/g, "").trim();
+	for (let i = 0; i < 150; i++) {
 		await new Promise((r) => setTimeout(r, 200));
 		try {
 			const res = await sendMessage(sock, { action: "read" });
 			handleUrls(res, noOpen);
-			const clean = stripAnsi(res.output ?? "").trim();
+			const clean = stripSpinners(stripAnsi(res.output ?? ""));
 			if (clean.length > 10) {
 				process.stdout.write(stripAnsi(res.output));
 				if (res.exited) {
