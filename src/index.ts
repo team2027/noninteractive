@@ -229,9 +229,19 @@ async function start(
 			const res = await sendMessage(sock, { action: "read" }, 2000);
 			if (res.ok) {
 				if (res.exited) {
-					// exited session — stop it and reuse the name
+					// exited session — stop it and wait for it to fully shut down
 					try {
 						await sendMessage(sock, { action: "stop" }, 2000);
+					} catch {}
+					// wait for old daemon to exit (up to 2s)
+					for (let j = 0; j < 20; j++) {
+						if (!existsSync(sock)) break;
+						await new Promise((r) => setTimeout(r, 100));
+					}
+					// force cleanup if still there
+					try {
+						const { unlinkSync } = await import("node:fs");
+						unlinkSync(sock);
 					} catch {}
 				} else {
 					// live session — error out
