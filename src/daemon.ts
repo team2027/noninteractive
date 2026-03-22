@@ -24,7 +24,6 @@ interface DaemonMessage {
 	data?: string;
 	wait?: boolean;
 	timeout?: number;
-	sinceLength?: number;
 }
 
 function getPtyBridge(): string {
@@ -107,6 +106,7 @@ export function runDaemon(
 	let outputBuffer = "";
 	let processExited = false;
 	let exitCode: number | null = null;
+	let lastReadLength = 0; // tracks what the client has seen
 	const detectedUrls = new Set<string>();
 	const reportedUrls = new Set<string>();
 
@@ -236,8 +236,9 @@ export function runDaemon(
 		});
 	});
 
-	function respondWithOutput(socket: Socket) {
+	function respondWithOutput(socket: Socket, updateSnapshot = true) {
 		readInterceptedUrls();
+		if (updateSnapshot) lastReadLength = outputBuffer.length;
 		const newUrls = Array.from(detectedUrls).filter(
 			(u) => !reportedUrls.has(u),
 		);
@@ -296,8 +297,8 @@ export function runDaemon(
 			case "read":
 				if (msg.wait) {
 					const timeout = msg.timeout ?? 30000;
-					const since = msg.sinceLength ?? outputBuffer.length;
-					waitForNewOutput(socket, since, timeout);
+					// wait for output beyond what the client last saw
+					waitForNewOutput(socket, lastReadLength, timeout);
 				} else {
 					respondWithOutput(socket);
 				}
@@ -310,6 +311,7 @@ export function runDaemon(
 				}
 				withSettleDelay(() => {
 					writeToStdin(msg.data);
+					lastReadLength = outputBuffer.length;
 					socket.end(JSON.stringify({ ok: true }));
 				});
 				break;

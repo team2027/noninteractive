@@ -366,11 +366,6 @@ async function read(
 	if (wait) {
 		msg.wait = true;
 		msg.timeout = timeout;
-		// get current output length so we wait for genuinely new output
-		try {
-			const snapshot = await sendMessage(sock, { action: "read" }, 5000);
-			msg.sinceLength = snapshot.outputLength ?? snapshot.output?.length ?? 0;
-		} catch {}
 	}
 	const clientTimeout = wait ? timeout + 5000 : 5000;
 	try {
