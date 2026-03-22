@@ -313,10 +313,10 @@ async function start(
 						`\n[session '${name}' started — read the output above, then use:]`,
 					);
 					console.log(
-						`  npx noninteractive send ${name} "<text>"          # send and get response`,
+						`  npx noninteractive send ${name} "<text>"      # send and get response (waits by default)`,
 					);
 					console.log(
-						`  npx noninteractive read ${name} --wait        # wait for new output`,
+						`  npx noninteractive read ${name} --wait        # wait for NEW output (no sleep needed)`,
 					);
 					console.log(
 						`  npx noninteractive stop ${name}               # stop the session`,
@@ -345,10 +345,10 @@ async function start(
 
 	console.log(`[session '${name}' started but no output yet — use:]`);
 	console.log(
-		`  npx noninteractive send ${name} "<text>"          # send and get response`,
+		`  npx noninteractive send ${name} "<text>"      # send and get response (waits by default)`,
 	);
 	console.log(
-		`  npx noninteractive read ${name} --wait        # wait for new output`,
+		`  npx noninteractive read ${name} --wait        # wait for NEW output (no sleep needed)`,
 	);
 	console.log(
 		`  npx noninteractive stop ${name}               # stop the session`,
@@ -414,7 +414,12 @@ async function send(
 			);
 			if (res.output !== undefined) process.stdout.write(stripAnsi(res.output));
 			handleUrls(res, noOpen);
-			if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
+			if (res.exited) {
+				console.log(`\n[exited ${res.exitCode}]`);
+				console.log(
+					`[session complete — output above is final, no need to read again]`,
+				);
+			}
 		} else {
 			await sendMessage(sock, { action: "send", data: text });
 			console.log(
@@ -493,7 +498,20 @@ async function main() {
 				cwd = startArgs[cwdIdx + 1];
 				startArgs.splice(cwdIdx, 2);
 			}
-			const filtered = startArgs.filter((a) => a !== "--no-open");
+			const filtered = startArgs.filter((a) => a !== "--no-open" && a !== "--");
+			if (filtered.includes("--help") || filtered.includes("-h")) {
+				console.log(`usage: noninteractive start [--name <session>] [--cwd <dir>] <cmd> [args...]
+
+examples:
+  npx noninteractive start npx eslint --init
+  npx noninteractive start --name myeslint --cwd /tmp/project npx eslint --init
+  npx noninteractive start node server.js
+
+flags:
+  --name <session>   set session name (default: auto-derived from command)
+  --cwd <dir>        set working directory for the command`);
+				process.exit(0);
+			}
 			if (filtered.length < 1) {
 				console.error(
 					"usage: noninteractive start [--name <session>] [--cwd <dir>] <cmd> [args...]\n\nexamples:\n  npx noninteractive start npx eslint --init\n  npx noninteractive start --name myeslint --cwd /tmp/project npx eslint --init",
@@ -607,7 +625,9 @@ async function main() {
 
 			// treat unknown commands as: start npx --yes <args>
 			const noOpen = mutableArgs.includes("--no-open");
-			const filteredArgs = mutableArgs.filter((a) => a !== "--no-open");
+			const filteredArgs = mutableArgs.filter(
+				(a) => a !== "--no-open" && a !== "--",
+			);
 			console.log(`[installing and running: npx ${filteredArgs.join(" ")}]`);
 			return start(["npx", "--yes", ...filteredArgs], noOpen, sessionName, cwd);
 		}
