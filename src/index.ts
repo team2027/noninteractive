@@ -220,11 +220,10 @@ async function start(
 	const executable = cmdArgs[0];
 	const args = cmdArgs.slice(1);
 	const baseName = sessionName || deriveSessionName(executable, args);
-	let name = baseName;
+	const name = baseName;
 
-	// auto-suffix if session name is already taken by a live session
-	let suffix = 1;
-	while (true) {
+	// check if session name is already taken
+	{
 		const sock = socketPath(name);
 		try {
 			const res = await sendMessage(sock, { action: "read" });
@@ -234,15 +233,16 @@ async function start(
 					try {
 						await sendMessage(sock, { action: "stop" });
 					} catch {}
-					break;
+				} else {
+					// live session — error out
+					console.error(
+						`session '${name}' is already running. use a different --name or stop it first:`,
+					);
+					console.error(`  npx noninteractive stop ${name}`);
+					process.exit(1);
 				}
-				// live session — try next suffix
-				suffix++;
-				name = `${baseName}-${suffix}`;
-				continue;
 			}
 		} catch {}
-		break;
 	}
 	const sock = socketPath(name);
 
@@ -310,13 +310,13 @@ async function start(
 					);
 				} else {
 					console.log(
-						`\n[session '${name}' started — read the output above, then use:]`,
+						`\n[session '${name}' started — the first prompt is shown above. use:]`,
 					);
 					console.log(
 						`  npx noninteractive send ${name} "<text>"      # send and get response (waits by default)`,
 					);
 					console.log(
-						`  npx noninteractive read ${name} --wait        # wait for NEW output (no sleep needed)`,
+						`  npx noninteractive read ${name} --wait        # only needed for long waits (e.g. OAuth, npm install)`,
 					);
 					console.log(
 						`  npx noninteractive stop ${name}               # stop the session`,
@@ -348,7 +348,7 @@ async function start(
 		`  npx noninteractive send ${name} "<text>"      # send and get response (waits by default)`,
 	);
 	console.log(
-		`  npx noninteractive read ${name} --wait        # wait for NEW output (no sleep needed)`,
+		`  npx noninteractive read ${name} --wait        # only needed for long waits (e.g. OAuth, npm install)`,
 	);
 	console.log(
 		`  npx noninteractive stop ${name}               # stop the session`,
@@ -372,7 +372,12 @@ async function read(
 		const res = await sendMessage(sock, msg, clientTimeout);
 		if (res.output !== undefined) process.stdout.write(stripAnsi(res.output));
 		handleUrls(res, noOpen);
-		if (res.exited) console.log(`\n[exited ${res.exitCode}]`);
+		if (res.exited) {
+			console.log(`\n[exited ${res.exitCode}]`);
+			console.log(
+				`[session complete — output above is final, no need to read again]`,
+			);
+		}
 	} catch {
 		// daemon gone — try persisted output file
 		const outputFile = sessionOutputFile(name);
