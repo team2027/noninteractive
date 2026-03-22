@@ -3,6 +3,7 @@ import { createConnection } from "node:net";
 export interface DaemonResponse {
 	ok: boolean;
 	output?: string;
+	outputLength?: number;
 	exited?: boolean;
 	exitCode?: number | null;
 	running?: boolean;

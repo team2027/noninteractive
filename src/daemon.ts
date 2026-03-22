@@ -24,6 +24,7 @@ interface DaemonMessage {
 	data?: string;
 	wait?: boolean;
 	timeout?: number;
+	sinceLength?: number;
 }
 
 function getPtyBridge(): string {
@@ -117,6 +118,11 @@ export function runDaemon(
 
 	let notifyDebounce: ReturnType<typeof setTimeout> | null = null;
 	const NOTIFY_SETTLE_MS = 50;
+
+	// anti-cascade: track last stdin write so rapid chained sends
+	// don't land keystrokes before the PTY settles from the previous interaction
+	let lastStdinWrite = 0;
+	const INPUT_SETTLE_MS = 150;
 
 	function notifyWaiters() {
 		if (waiters.length === 0) return;
@@ -240,6 +246,7 @@ export function runDaemon(
 			JSON.stringify({
 				ok: true,
 				output: outputBuffer,
+				outputLength: outputBuffer.length,
 				exited: processExited,
 				exitCode,
 				...(newUrls.length > 0 ? { urls: newUrls } : {}),
@@ -268,12 +275,29 @@ export function runDaemon(
 		waiters.push(waiter);
 	}
 
+	function writeToStdin(data: string | undefined) {
+		lastStdinWrite = Date.now();
+		stdin?.write(data);
+	}
+
+	function withSettleDelay(fn: () => void) {
+		const now = Date.now();
+		const elapsed = now - lastStdinWrite;
+		const delay = Math.max(0, INPUT_SETTLE_MS - elapsed);
+		if (delay > 0) {
+			setTimeout(fn, delay);
+		} else {
+			fn();
+		}
+	}
+
 	function handle(msg: DaemonMessage, socket: Socket) {
 		switch (msg.action) {
 			case "read":
 				if (msg.wait) {
 					const timeout = msg.timeout ?? 30000;
-					waitForNewOutput(socket, outputBuffer.length, timeout);
+					const since = msg.sinceLength ?? outputBuffer.length;
+					waitForNewOutput(socket, since, timeout);
 				} else {
 					respondWithOutput(socket);
 				}
@@ -284,8 +308,10 @@ export function runDaemon(
 					socket.end(JSON.stringify({ ok: false, error: "process exited" }));
 					break;
 				}
-				stdin?.write(msg.data);
-				socket.end(JSON.stringify({ ok: true }));
+				withSettleDelay(() => {
+					writeToStdin(msg.data);
+					socket.end(JSON.stringify({ ok: true }));
+				});
 				break;
 
 			case "sendread": {
@@ -295,8 +321,10 @@ export function runDaemon(
 				}
 				const beforeLength = outputBuffer.length;
 				const timeout = msg.timeout ?? 30000;
-				stdin?.write(msg.data);
-				waitForNewOutput(socket, beforeLength, timeout);
+				withSettleDelay(() => {
+					writeToStdin(msg.data);
+					waitForNewOutput(socket, beforeLength, timeout);
+				});
 				break;
 			}
 
