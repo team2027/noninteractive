@@ -427,6 +427,25 @@ async function send(
 		.replace(/\\r/g, "\r")
 		.replace(/\\n/g, "\n")
 		.replace(/\\t/g, "\t");
+	// detect literal key names that agents type by mistake
+	const keyHints: Record<string, string> = {
+		ENTER: "\\r",
+		RETURN: "\\r",
+		DOWN: "\\x1b[B",
+		UP: "\\x1b[A",
+		LEFT: "\\x1b[D",
+		RIGHT: "\\x1b[C",
+		TAB: "\\t",
+		ESCAPE: "\\x1b",
+		ESC: "\\x1b",
+		BACKSPACE: "\\x7f",
+	};
+	const upper = text.replace(/[\s\r\n]/g, "").toUpperCase();
+	if (keyHints[upper]) {
+		console.error(
+			`hint: "${text}" was sent as literal text. for the ${upper} key, use "${keyHints[upper]}" instead.`,
+		);
+	}
 	const sock = socketPath(name);
 	try {
 		if (wait) {
