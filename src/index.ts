@@ -67,7 +67,10 @@ function stripAnsi(s: string): string {
 		if (s[i] === "\x1b" && s[i + 1] === "[") {
 			const end = s.indexOf("m", i + 2);
 			if (end !== -1 && end - i < 16 && /^[\d;]*$/.test(s.slice(i + 2, end))) {
-				const codes = s.slice(i + 2, end).split(";").map(Number);
+				const codes = s
+					.slice(i + 2, end)
+					.split(";")
+					.map(Number);
 				for (const code of codes) {
 					if (code === 1 || code === 4 || code === 7) {
 						// bold, underline, or inverse ON
@@ -94,19 +97,33 @@ function stripAnsi(s: string): string {
 		if (s[i] === "\x1b") {
 			if (s[i + 1] === "[") {
 				const end = s.slice(i + 2).search(/[\x40-\x7e]/);
-				if (end !== -1) { i += end + 3; continue; }
+				if (end !== -1) {
+					i += end + 3;
+					continue;
+				}
 			} else if (s[i + 1] === "]") {
 				const end = s.indexOf("\x07", i);
-				if (end !== -1) { i = end + 1; continue; }
+				if (end !== -1) {
+					i = end + 1;
+					continue;
+				}
 				const end2 = s.indexOf("\x1b\\", i);
-				if (end2 !== -1) { i = end2 + 2; continue; }
+				if (end2 !== -1) {
+					i = end2 + 2;
+					continue;
+				}
 			} else if (s[i + 1] === "(" || s[i + 1] === ")") {
-				i += 3; continue;
+				i += 3;
+				continue;
 			} else {
-				i += 2; continue;
+				i += 2;
+				continue;
 			}
 		}
-		if (s[i] === "\x07") { i++; continue; }
+		if (s[i] === "\x07") {
+			i++;
+			continue;
+		}
 		if (bold) {
 			boldBuf += s[i];
 		} else {
@@ -121,9 +138,7 @@ function stripAnsi(s: string): string {
 		result += boldBuf;
 	}
 
-	return result
-		.replace(/\r\n?/g, "\n")
-		.replace(/\n{3,}/g, "\n\n");
+	return result.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n");
 }
 
 const seenUrls = new Set<string>();
@@ -382,7 +397,10 @@ async function send(
 	// empty string "" is a shorthand for pressing Enter
 	if (text === "") text = "\r";
 	// parse C-style escape sequences so agents don't need shell $'...' quoting
-	text = text.replace(/\\x([0-9a-fA-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+	text = text
+		.replace(/\\x([0-9a-fA-F]{2})/g, (_, hex) =>
+			String.fromCharCode(parseInt(hex, 16)),
+		)
 		.replace(/\\r/g, "\r")
 		.replace(/\\n/g, "\n")
 		.replace(/\\t/g, "\t");
@@ -475,9 +493,7 @@ async function main() {
 				cwd = startArgs[cwdIdx + 1];
 				startArgs.splice(cwdIdx, 2);
 			}
-			const filtered = startArgs.filter(
-				(a) => a !== "--no-open",
-			);
+			const filtered = startArgs.filter((a) => a !== "--no-open");
 			if (filtered.length < 1) {
 				console.error(
 					"usage: noninteractive start [--name <session>] [--cwd <dir>] <cmd> [args...]\n\nexamples:\n  npx noninteractive start npx eslint --init\n  npx noninteractive start --name myeslint --cwd /tmp/project npx eslint --init",
@@ -572,9 +588,16 @@ async function main() {
 
 			// detect remaining wrong flags before the tool name
 			const wrongFlags = ["--dir", "--session"];
-			const firstPositional = mutableArgs.findIndex((a) => !a.startsWith("-") && a !== "--");
-			const flagsBefore = firstPositional === -1 ? mutableArgs : mutableArgs.slice(0, firstPositional);
-			const wrongFlag = flagsBefore.find((a) => wrongFlags.includes(a.split("=")[0]));
+			const firstPositional = mutableArgs.findIndex(
+				(a) => !a.startsWith("-") && a !== "--",
+			);
+			const flagsBefore =
+				firstPositional === -1
+					? mutableArgs
+					: mutableArgs.slice(0, firstPositional);
+			const wrongFlag = flagsBefore.find((a) =>
+				wrongFlags.includes(a.split("=")[0]),
+			);
 			if (wrongFlag) {
 				console.error(
 					`unknown flag: ${wrongFlag}\n\nhint: use --name for session name, --cwd for working directory.`,
