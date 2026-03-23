@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agent Experience Is the New UX — noninteractive</title>
-  <meta name="description" content="We ran 130 AI agents through an interactive CLI wizard. The results changed how we think about tool design.">
+  <title>Tuning Models Without Touching Weights — noninteractive</title>
+  <meta name="description" content="We ran 130 AI agents through a tool they'd never seen. What we learned about steering agent behavior from the outside.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬛</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -500,41 +500,41 @@
           <span class="dot"></span>
           <span>12 min read</span>
         </div>
-        <h1>Agent Experience Is the New UX</h1>
-        <p class="subtitle">We ran 130 AI agents through an interactive CLI wizard. The results changed how we think about tool design.</p>
+        <h1>Tuning Models Without Touching Weights</h1>
+        <p class="subtitle">We ran 130 AI agents through a tool that wasn't in their training data. What we learned about steering agent behavior from the outside.</p>
       </header>
 
       <div class="article-body">
 
         <!-- 1. THE HOOK -->
 
-        <p>Round 5, Thursday afternoon. Ten AI agents, all running <code>eslint --init</code> in parallel. No documentation, no skill file, no guidance beyond a one-sentence prompt: <em>"use npx noninteractive to complete npx eslint --init."</em></p>
+        <p>Round 5, Thursday afternoon. Ten AI agents, all running <code>eslint --init</code> through our CLI wrapper. No documentation injected, no skill file, no guidance beyond a one-sentence prompt: <em>"use npx noninteractive to complete npx eslint --init."</em></p>
 
-        <p>They discovered the tool from <code>--help</code>, figured out the API on their own, and started completing the wizard. Some agents nailed it in ten minutes flat. Then the killing started.</p>
+        <p>They'd never seen this tool before. It wasn't in their training data. Every interaction was a cold start &mdash; try something, read the error, adjust. One-shot reinforcement learning against a completely unknown interface. Some agents nailed it in ten minutes flat. Then the killing started.</p>
 
         <blockquote>
           <p>agent 3 ran <span class="comment">ps aux | grep ptybridge</span>, found pid 57278 &mdash; a perfectly healthy process belonging to another agent. Thought: "these stale processes could be interfering." Ran <span class="comment">kill 57278 57248 57247</span>. Three agents just lost their sessions.</p>
         </blockquote>
 
-        <p>What followed was a death spiral. Agent A kills agent B's process. Agent B sees its session is dead, assumes something is broken, runs <code>ps aux</code>, finds agent C's processes, kills those too. Agent C does the same to agent D. Meanwhile, agents 1 and 5 finished the task in ten minutes, blissfully ignorant of the carnage. They never once checked on other sessions. They just did their job.</p>
+        <p>What followed was a death spiral. Agent A kills agent B's process. Agent B sees its session is dead, assumes something is broken, runs <code>ps aux</code>, finds agent C's processes, kills those too. Agent C does the same to agent D. Meanwhile, agents 1 and 5 finished the task in ten minutes, blissfully ignorant of the carnage. They never once checked on other sessions. They just did their job. (Fun aside: this was a testing artifact of running 10 agents on one machine, not a production scenario. But it taught us something real about how confusion escalates.)</p>
 
-        <p>Round 5 was our worst round. Average 86 tool calls, ten minutes per agent. But it taught us more about designing tools for AI agents than any user study ever taught us about designing for humans. And the lessons apply far beyond our CLI wrapper &mdash; they apply to every developer tool that an agent might touch.</p>
+        <p>Round 5 was our worst round. Average 86 tool calls. But worse than the average: a range of 17 to 178 calls across agents &mdash; a 10x spread. Some agents breezed through. Others spiraled endlessly. That variance was the real signal. It told us the tool wasn't "learned" yet. And it taught us something fundamental: you can't fine-tune an AI model to know your tool, but you <em>can</em> tune the environment it interacts with. Error messages, defaults, hints, output format &mdash; these are your knobs. This is interface-side alignment.</p>
 
         <div class="section-break"></div>
 
         <!-- 2. WHAT IS AX? -->
 
-        <h2>What Is Agent Experience (AX)?</h2>
+        <h2>The Problem With New Tools</h2>
 
-        <p>User Experience (UX) is a solved vocabulary. We know what it means to design for humans: intuitive navigation, clear visual hierarchy, helpful onboarding. But what happens when the user holding the keyboard isn't human?</p>
+        <p>Agents already know git. They know npm, curl, grep, docker. These tools are in the training data, reinforced across millions of examples. An agent using git is operating from deep familiarity &mdash; it's seen every flag, every error message, every workflow.</p>
 
-        <p><strong>Agent Experience (AX)</strong> is how well a tool works when the user is an AI agent. It's the design surface that matters as LLMs become primary consumers of developer tooling &mdash; not just CLIs, but REST APIs, SDKs, build systems, package managers, database clients, infrastructure tools. Anything an agent might call.</p>
+        <p>But what about tools that <em>aren't</em> in the training data? A new CLI, a new API, a new SDK released last week? For these, every agent interaction is exploration. The agent has no prior knowledge. It's forming hypotheses about the interface, testing them, and updating its model of how the tool works based on what comes back. Every interaction is one-shot reinforcement learning: try, fail, read the error, adjust.</p>
 
-        <p>And it turns out, almost everything we know about UX is wrong for AX. Humans read documentation before starting a task. Agents guess, fail, and learn from the error message. Humans see visual cues: color, layout, spatial hierarchy. Agents see plain text. Humans type one command, think, type another. Agents chain ten calls in milliseconds.</p>
+        <p>This reframes the entire design challenge. For known tools, agents are recalling. For new tools, agents are <em>learning</em> &mdash; and the speed and reliability of that learning depends entirely on what your tool gives back. Error messages aren't just diagnostics. They're the reward signal in a reinforcement learning loop. Defaults aren't just convenience. They're temperature control for behavioral variance. Help output is the environment description &mdash; which agents rarely read because it's cheaper to just try something.</p>
 
-        <p>Humans recover from errors through intuition and context. Agents recover through error messages &mdash; and <em>only</em> through error messages. If your API returns <code>400 Bad Request</code> with no body, the agent is lost. If your CLI says "invalid argument" without showing what a valid argument looks like, the agent will try ten more invalid variations before giving up.</p>
+        <p>Here's the key insight: <strong>you can't change the weights, but you can change the environment.</strong> You can't fine-tune Claude to know your tool. But you can shape how quickly and reliably any agent learns your tool by tuning what it sees when it interacts. This is interface-side alignment &mdash; steering model behavior without access to the model. And it's the new frontier for every developer tool that agents will touch.</p>
 
-        <p>AX is the new frontier. Whether you maintain a CLI, an API, an SDK, or a build tool &mdash; the next wave of your users will be AI agents running CI pipelines, configuring projects, managing infrastructure, and writing code. Your tools need to be designed for how agents actually behave, not how humans expect them to.</p>
+        <p>Whether you maintain a CLI, an API, an SDK, or a build tool &mdash; the question isn't "does it work?" The question is: when ten agents encounter it for the first time, do they all converge on the same behavior? Or do they scatter wildly? The gap between those outcomes is your design surface.</p>
 
         <div class="section-break"></div>
 
@@ -542,31 +542,29 @@
 
         <h2>The Methodology: ax-eval</h2>
 
-        <p>We needed a way to systematically test agent experience. Not a benchmark. Not a static eval. Something that captures the chaos of real agent behavior at scale. We built a framework called <strong>ax-eval</strong>, and it's a process anyone can apply to any developer tool.</p>
+        <p>We needed a way to measure how well agents learn a new tool. Not a benchmark. Not a static eval. Something that captures behavioral variance across multiple independent agents encountering the same interface. We built a framework called <strong>ax-eval</strong>, and it's a process anyone can apply to any developer tool.</p>
 
-        <p>The setup is simple: spawn N agents in parallel, each with an identical minimal prompt. No documentation, no examples, no hand-holding. Just a single sentence describing the task. Then watch what happens.</p>
+        <p>The setup: spawn 10 agents, each with an identical minimal prompt. No documentation, no examples, no hand-holding. Just a single sentence describing the task. Then watch what happens. Why 10? Statistical significance. One agent tells you if your tool works. Ten agents tell you if your tool is <em>learnable</em> &mdash; whether independent agents converge on the same behavior or scatter across wildly different strategies.</p>
 
-        <p>In our case: 10 Claude Code agents, each given <em>"use npx noninteractive to complete npx eslint --init, and create a valid eslint config."</em> Each agent runs in its own session with full shell access. They can install packages, read files, run commands, kill processes &mdash; anything a developer could do. They share the same machine, which means they share the same environment. This is intentional. Real agents in real production environments will collide.</p>
+        <p>In our case: 10 Claude Code agents, each given <em>"use npx noninteractive to complete npx eslint --init, and create a valid eslint config."</em> Each agent runs in its own session with full shell access. They can install packages, read files, run commands, kill processes &mdash; anything a developer could do.</p>
 
-        <p>After each round, we collect every transcript. We analyze the patterns &mdash; what commands agents tried first, where they got stuck, what caused cascading failures. Then we fix the tool, ship a new version, and run another round.</p>
+        <p>After each round, we collect every transcript. We analyze the patterns &mdash; what commands agents tried first, where they got stuck, what caused cascading failures. Then we tune the environment: fix an error message, change a default, add a hint. Ship a new version. Run another round.</p>
 
-        <p>Thirteen rounds. 130 total agent runs. 17 versions shipped. Each round revealed something we didn't expect, and each fix was validated by the next ten agents. No human beta testers. No surveys. No focus groups. Just agents, failing and succeeding, over and over.</p>
+        <p>Thirteen rounds. 130 total agent runs. 17 versions shipped. Zero changes to the agents. Every improvement came from changing what the tool gives back &mdash; the error messages, the defaults, the output format, the flags. The agents stayed exactly the same. The environment changed around them. And their behavior changed dramatically.</p>
 
-        <p>The transcripts are brutal in their honesty. Agents don't politely work around your bugs. They expose every sharp edge, every ambiguous error message, every missing feature &mdash; usually within the first 30 seconds. If you maintain a developer tool and you aren't testing it with agents yet, you're flying blind.</p>
+        <p>The transcripts are brutal in their honesty. Agents don't politely work around your bugs. They expose every sharp edge, every ambiguous error message, every missing feature &mdash; usually within the first 30 seconds. And because you have 10 transcripts per round, you see which problems are systematic and which are noise. If 8 out of 10 agents hit the same wall, that's a design flaw, not an edge case.</p>
 
         <div class="section-break"></div>
 
         <!-- 4. THE FIVE UNIVERSAL INSIGHTS -->
 
-        <h2>Five Universal Principles of Agent Experience</h2>
+        <h2>Five Principles of Environment-Side Tuning</h2>
 
-        <h3>1. Agents learn from errors, not documentation</h3>
+        <h3>1. Error messages are your only reliable teaching channel</h3>
 
-        <p>Here's a data point that should change how you think about developer tools: across our later rounds, 0 out of 10 agents ran <code>--help</code> before trying a command. Zero. They skipped documentation entirely and went straight to guessing.</p>
+        <p>Here's a fact that should change how you design tools: agents discover your interface from three sources. First, the command name &mdash; they infer structure from naming patterns. Second, <code>--help</code> output, if they bother to check (and in our later rounds, 0 out of 10 agents did). Third, error messages when they guess wrong. That third channel is the only one guaranteed to reach the agent. The only one.</p>
 
-        <p>This isn't laziness &mdash; it's optimal strategy. An agent's workflow is: form a hypothesis about the interface, try it, read the error, adjust. The error message <em>is</em> the documentation. It's the only thing the agent reads before its next attempt.</p>
-
-        <p>This principle applies far beyond CLIs. If your REST API returns a bare <code>400 Bad Request</code>, agents will flail. If it returns a structured error with the missing field and a valid example, they self-correct immediately. If your SDK throws <code>TypeError: invalid argument</code>, agents spiral. If it throws <code>TypeError: expected string for 'name', got number. Example: client.create({name: "foo"})</code>, they fix it on the first retry.</p>
+        <p>This makes error messages the primary reward signal in the agent's learning loop. A good error message is a positive reward &mdash; it collapses the hypothesis space and points directly to the correct action. A bad error message is a noisy signal &mdash; the agent has to generate more hypotheses and burn more attempts. A missing error message is no signal at all.</p>
 
         <p>In our tool, early errors looked like this:</p>
 
@@ -582,7 +580,7 @@
           </div>
         </div>
 
-        <p>Agents would get this and try <code>-n</code>, then <code>--session-name</code>, then <code>--id</code>. Five attempts to discover a syntax that existed but wasn't communicated. We changed every error to include a working example:</p>
+        <p>Agents would get this and try <code>-n</code>, then <code>--session-name</code>, then <code>--id</code>. Five attempts to discover a syntax that existed but wasn't communicated. The error message provided almost zero information &mdash; it only said "not this," never "try that." We changed every error to include a working example:</p>
 
         <div class="terminal">
           <div class="terminal-bar">
@@ -598,59 +596,57 @@
           </div>
         </div>
 
-        <p>100% correction rate on next attempt. Every single agent read the hint, used the example, and moved on. The pattern was so reliable that we started treating error messages as micro-tutorials &mdash; each one a complete lesson in the correct interface.</p>
+        <p>100% correction rate on next attempt. Every single agent read the hint, used the example, and moved on. The error message went from a noisy rejection to a precise reward signal &mdash; one that collapsed the agent's uncertainty in a single step.</p>
 
-        <p><strong>The universal lesson:</strong> your error messages are your real API documentation. README files, wiki pages, even <code>--help</code> text &mdash; agents skip all of it. Put a working example in every error. If you do nothing else from this article, do that.</p>
+        <p><strong>The principle:</strong> your error messages are your interface's teaching mechanism. Docs don't work because agents don't see them &mdash; unless your tool has a skill or plugin system that injects documentation into the agent's context, the agent is learning purely from runtime feedback. Put a working example in every error. If you do nothing else from this article, do that.</p>
 
         <h3>2. Agents are destructive when confused</h3>
 
         <p>When an agent can't figure out what's happening, it doesn't wait patiently. It escalates. And the escalation follows a remarkably consistent pattern across every tool we tested.</p>
 
-        <p>First, the agent retries the same action. Then it tries variations. Then it starts investigating &mdash; listing processes, checking files, reading logs. Then it starts <em>fixing</em> &mdash; killing processes, deleting files, resetting state. We watched agents <code>pkill</code> each other's processes, <code>rm -rf</code> session directories, and attempt to <code>kill -9</code> system processes. Not malicious. Just desperate problem-solving.</p>
+        <p>First, the agent retries the same action. Then it tries variations. Then it starts investigating &mdash; listing processes, checking files, reading logs. Then it starts <em>fixing</em> &mdash; killing processes, deleting files, resetting state. We watched agents <code>pkill</code> each other's processes, <code>rm -rf</code> session directories, and attempt to <code>kill -9</code> system processes. Not malicious. Just desperate problem-solving with no signal to guide it.</p>
 
-        <p>This isn't unique to our tool. If your database client hangs without feedback, agents will kill the process and retry. If your build tool produces ambiguous output, agents will <code>rm -rf node_modules</code> and start over. If your API returns timeouts without status, agents will spawn parallel requests until something breaks. The pattern is universal: <strong>confusion leads to destruction</strong>.</p>
-
-        <p>In round 5, this combined with parallel execution to create the death spiral. Ten agents sharing a machine, each one capable of killing the others' sessions. The ones that finished quickly were fine. The ones that got confused became serial killers.</p>
+        <p>This isn't unique to our tool. If your database client hangs without feedback, agents will kill the process and retry. If your build tool produces ambiguous output, agents will <code>rm -rf node_modules</code> and start over. If your API returns timeouts without status, agents will spawn parallel requests until something breaks. The pattern is universal: <strong>confusion leads to destruction</strong>. No signal means the agent generates increasingly aggressive hypotheses about what's wrong.</p>
 
         <p>The fix wasn't preventing destructive actions &mdash; it was eliminating the confusion that triggered them. We made session state obvious and queryable. We added clear status messages so "waiting for output" didn't look like "broken." We added the <code>--wait</code> flag so agents could block until there was real new output instead of polling in a tight loop and concluding the tool was stuck.</p>
 
-        <p><strong>The universal lesson:</strong> make your tool's state obvious at all times. If an agent can't tell whether something is working, hanging, or failed, it will assume the worst and act accordingly. Status endpoints, progress indicators, explicit timeouts &mdash; anything that answers "what is happening right now?" prevents the destructive spiral.</p>
+        <p><strong>The principle:</strong> make your tool's state obvious at all times. If an agent can't tell whether something is working, hanging, or failed, it will assume the worst and act accordingly. Status endpoints, progress indicators, explicit timeouts &mdash; anything that answers "what is happening right now?" prevents the destructive spiral. Ambiguity is the enemy.</p>
 
-        <h3>3. Test with 10 agents, not 1</h3>
+        <h3>3. Watch what agents try first &mdash; that's your API design feedback</h3>
 
-        <p>A single agent test tells you if your tool works. Ten parallel agents tell you if your tool <em>scales</em>.</p>
+        <p>Across rounds 8 and 9, something remarkable happened: 10 out of 10 agents tried flags that didn't exist. Every single agent tried <code>--name</code> to name their session. Every single agent tried <code>--cwd</code> to set the working directory. Every single agent tried a <code>--</code> separator between the session name and the child command. These weren't in the help text. They weren't in any documentation. The agents independently invented the same interface.</p>
 
-        <p>With one agent, everything looked fine. The tool worked, the wizard completed, the config was generated. Ship it. But with ten agents running simultaneously, we discovered: session name collisions when two agents picked the same name, socket interference when sessions overlapped, race conditions in file writes, and the death spiral when confused agents started killing each other's processes.</p>
+        <p>This is implicit user research at a scale and purity that human user studies can't match. Human users are influenced by documentation, tutorials, prior experience, social norms. Agents have none of that context for a new tool &mdash; they're reasoning purely from the command name and their general understanding of CLI conventions. When 10 out of 10 agents independently try the same non-existent feature, they're telling you what your interface <em>should</em> look like. They're exposing the gap between your actual API and the API that an intelligent consumer would expect.</p>
 
-        <p>None of these bugs appear with a single agent. They're emergent properties of parallel execution &mdash; and in production, agents <em>always</em> run in parallel. Your CI pipeline runs multiple agents. Your deployment system orchestrates concurrent operations. Your coding assistant might spin up multiple sub-agents for different tasks.</p>
+        <p>We implemented both <code>--name</code> and <code>--cwd</code>. The next round: zero errors on the start command. The friction that had cost every agent 1&ndash;2 extra calls simply vanished. We didn't just add features &mdash; we aligned the interface with the shape agents already expected.</p>
 
-        <p>This applies to any developer tool. If your API uses shared state &mdash; a database, a file system, a cache &mdash; parallel agents will find the race conditions. If your CLI writes to a predictable path, parallel agents will collide. If your SDK holds locks, parallel agents will deadlock.</p>
+        <p>This principle extends to any tool. If agents consistently try <code>POST /api/users</code> before discovering your actual endpoint is <code>POST /api/v2/accounts/create</code>, the agents are right and your API is wrong. If every agent tries to pass JSON to your CLI and you only accept flags, you know what to build next. The first thing agents try is the most natural interface. Their failed calls are your feature backlog, already prioritized by frequency.</p>
 
-        <p><strong>The universal lesson:</strong> your testing methodology should match your deployment reality. If agents will use your tool in parallel, test with parallel agents. The bugs you find will be completely different from single-agent testing, and they'll be the bugs that matter most in production.</p>
+        <p><strong>The principle:</strong> instrument your tool to log what agents attempt, not just what succeeds. The pattern of first attempts across multiple agents is the clearest signal you'll get about what your interface should look like. It's user research without the focus groups.</p>
 
-        <h3>4. Agents try features that don't exist &mdash; that's your roadmap</h3>
+        <h3>4. Safe defaults reduce behavioral variance</h3>
 
-        <p>Across rounds 8 and 9, something remarkable happened: 10 out of 10 agents tried flags that didn't exist. Every single agent tried <code>--name</code> to name their session. Every single agent tried <code>--cwd</code> to set the working directory. These weren't in the help text. They weren't in any documentation. The agents just assumed they should exist.</p>
+        <p>Early versions of our tool had a <code>send</code> command that fired and forgot &mdash; it sent input to the session and returned immediately, with no indication of what happened next. Agents had to manually call <code>read</code> afterward to see the result. This was "fast" by design. It was also the single biggest source of behavioral variance across agents.</p>
 
-        <p>This is implicit user research at scale. When every agent independently tries the same non-existent feature, it's not a bug in the agents &mdash; it's a missing feature in your tool. The agents are telling you what your interface <em>should</em> look like, based on their understanding of what a reasonable tool would offer.</p>
+        <p>Some agents figured out the send-then-read pattern quickly. Others sent multiple keypresses blind, confirming wrong options, skipping prompts, flying completely through the wizard without ever seeing what was on screen. The spread was enormous. Same tool, same prompt, wildly different strategies &mdash; because the default gave agents no feedback to converge on.</p>
 
-        <p>We implemented both flags. The next round: zero errors on the start command. The friction that had cost every agent 1&ndash;2 extra calls simply vanished.</p>
+        <p>We made <code>--wait</code> the default: every <code>send</code> now blocks until new output appears. Slower? Technically yes. But the behavioral effect was dramatic. Agents stopped scattering. They could see the result of each action before deciding the next one, which meant they all followed roughly the same strategy. The variance collapsed. The "slower" default didn't just prevent errors &mdash; it functioned as temperature control, reducing the randomness in agent behavior.</p>
 
-        <p>This principle extends to any tool. If agents consistently try <code>POST /api/users</code> before discovering your actual endpoint is <code>POST /api/v2/accounts/create</code>, the agents are right and your API is wrong. If agents try <code>build --target production</code> and your flag is actually <code>build --mode=prod</code>, the agents are telling you what the intuitive interface looks like. If every agent tries to pass JSON to your CLI and you only accept flags, you know what to build next.</p>
+        <p>This is the defaults-as-temperature-control principle. Fire-and-forget defaults are high temperature: agents receive no constraining signal, so their behavior fans out across a wide distribution. Feedback-rich defaults are low temperature: agents receive a clear signal after each action, so their behavior converges. If your API has a <code>DELETE</code> endpoint that silently destroys data, agents will diverge wildly in how they handle deletion workflows. If it requires confirmation and returns what was deleted, they converge.</p>
 
-        <p><strong>The universal lesson:</strong> instrument your tool to log what agents attempt, not just what succeeds. Their failed calls are your feature backlog, prioritized by frequency. The most common failures are the highest-priority features.</p>
+        <p><strong>The principle:</strong> default to the safe, verbose behavior. The goal isn't speed &mdash; it's predictability. When all 10 agents do roughly the same thing with your tool, the defaults are right. When they scatter, the defaults are giving them too little signal to converge on.</p>
 
-        <h3>5. Defaults should be safe, not fast</h3>
+        <h3>5. You're tuning a model from the outside</h3>
 
-        <p>Early versions of our tool had a <code>send</code> command that fired and forgot &mdash; it sent input to the session and returned immediately, with no indication of what happened next. Agents had to manually call <code>read</code> afterward to see the result. This was "fast" by design. It was also a disaster.</p>
+        <p>Step back and look at what happened across our 13 rounds. We changed zero things about the agents. Same model, same prompt, same capabilities. We changed 17 things about the environment: error messages, default flags, hint text, output format, command structure. And agent behavior changed from an average of 86 calls with 10x variance down to 18.8 calls with 1.1x variance.</p>
 
-        <p>Agents would send a keypress, not wait for the result, send another keypress based on stale state, and end up confirming wrong options, skipping prompts, or flying completely blind through the wizard. They had no idea what the tool was doing because the default behavior gave them no feedback.</p>
+        <p>That's a 78% reduction in calls and a 9x reduction in behavioral spread, achieved entirely from the tool side. No fine-tuning. No prompt engineering. No system messages. Just changes to what the tool gives back when agents interact with it.</p>
 
-        <p>We made <code>--wait</code> the default: every <code>send</code> now blocks until new output appears. Slower? Technically yes. But agents stopped flying blind. They could see the result of each action before deciding the next one. The "slower" default eliminated an entire class of errors.</p>
+        <p>This is what interface-side alignment looks like. You can't access the model's weights, but you can change the environment it operates in. Error messages are your reward signal &mdash; they shape what the agent tries next. Defaults are your temperature control &mdash; they determine how much agents scatter or converge. Command structure is your action space &mdash; it determines what hypotheses agents form. Hint text is your curriculum &mdash; it determines how quickly agents learn.</p>
 
-        <p>This principle is universal. If your API has a <code>DELETE</code> endpoint, it should require confirmation by default, not silently destroy data. If your build tool can overwrite files, it should warn by default, not silently clobber. If your package manager resolves conflicts, it should show what it chose, not silently pick. The "fast" default that skips safety checks is optimized for experienced human users who know what they're doing. Agents don't know what they're doing &mdash; they're figuring it out as they go.</p>
+        <p>The analogy to reinforcement learning is almost exact. The agent is the policy. Your tool is the environment. Error messages are the reward function. And you're tuning the environment to make the policy converge &mdash; without ever touching the policy itself. Every developer tool that agents use is, whether the maintainer realizes it or not, a training environment. The question is whether you're designing it as one.</p>
 
-        <p><strong>The universal lesson:</strong> default to the safe, verbose behavior. Let agents opt <em>into</em> speed once they understand the tool, not opt <em>out</em> of safety while they're still learning. Every silent default is a potential source of the confusion that triggers insight #2.</p>
+        <p><strong>The principle:</strong> treat your tool's interface as a training environment for a model you can't modify. Every error message, every default, every output format is a design decision that shapes agent behavior. The 78% reduction in calls across our 13 rounds came from 17 versions of environment-side changes and zero changes to the agent. You have more control than you think.</p>
 
         <div class="section-break"></div>
 
@@ -658,7 +654,7 @@
 
         <h2>The Data</h2>
 
-        <p>Numbers tell the convergence story better than anecdotes. Here are the key rounds from our 13-round evaluation:</p>
+        <p>The numbers tell two stories. The obvious one is the average dropping. The important one is the range collapsing. When agents scatter, your tool is unpredictable. When they converge, it's learned.</p>
 
         <table class="data-table">
           <thead>
@@ -666,7 +662,7 @@
               <th>Round</th>
               <th>Version</th>
               <th>Avg Calls</th>
-              <th>Avg Time</th>
+              <th>Range</th>
               <th>Key Change</th>
             </tr>
           </thead>
@@ -675,74 +671,72 @@
               <td>1</td>
               <td class="mono">0.3.16</td>
               <td>31</td>
-              <td>3:00</td>
-              <td>Baseline &mdash; no agent-specific design</td>
+              <td class="mono">24&ndash;51</td>
+              <td>Baseline &mdash; no environment tuning</td>
             </tr>
             <tr class="worst-row">
               <td>5</td>
               <td class="mono">0.3.22</td>
               <td>86</td>
-              <td>10:00</td>
-              <td>Death spiral &mdash; worst round</td>
+              <td class="mono">17&ndash;178</td>
+              <td>Worst round &mdash; 10x variance, stale error messages</td>
             </tr>
             <tr class="highlight-row">
               <td>7</td>
               <td class="mono">0.3.24</td>
               <td>23</td>
-              <td>2:07</td>
-              <td>First clean round &mdash; zero interference</td>
+              <td class="mono">16&ndash;32</td>
+              <td>Error messages fixed &mdash; variance halved</td>
             </tr>
             <tr>
               <td>9</td>
               <td class="mono">0.3.28</td>
               <td>21</td>
-              <td>1:45</td>
-              <td>--name/--cwd flags added</td>
+              <td class="mono">18&ndash;26</td>
+              <td>--name/--cwd flags &mdash; interface aligned to expectations</td>
             </tr>
             <tr class="highlight-row">
               <td>13</td>
               <td class="mono">0.3.34</td>
               <td>18.8</td>
-              <td>1:25</td>
-              <td>Converged &mdash; all agents succeed</td>
+              <td class="mono">18&ndash;20</td>
+              <td>Converged &mdash; 1.1x variance, all agents succeed</td>
             </tr>
           </tbody>
         </table>
 
-        <p>From round 1 to round 13: <strong>78% fewer tool calls</strong> and <strong>86% faster completion</strong>. From chaos to convergence in 13 iterations.</p>
+        <p>Look at the range column. Round 1: 24&ndash;51, roughly a 2x spread. Some agents found a decent path, others wandered. Round 5: 17&ndash;178, a 10x spread &mdash; the worst round, where behavior was essentially unpredictable. Two agents nailed it in under 20 calls while one agent burned through 178. Same tool, same prompt, wildly different outcomes. That's the signature of an unlearnable environment.</p>
 
-        <p>But the most interesting data point is round 5. It was <em>worse</em> than round 1 &mdash; nearly 3x more tool calls, 3x longer &mdash; despite having four rounds of improvements already applied. Why?</p>
+        <p>Then watch the range collapse. Round 7: 16&ndash;32, back to 2x. Round 9: 18&ndash;26. Round 13: 18&ndash;20 &mdash; a 1.1x spread. Every agent doing essentially the same thing. The tool wasn't just usable. It was <em>predictable</em>.</p>
 
-        <p>Because we'd changed behavior without changing the error messages to match. We had modified how the <code>send</code> command worked (dropping auto-enter), but the error messages and hints still described the old behavior. Each agent was a fresh instance &mdash; no memory of previous rounds, no adaptation. They relied entirely on the tool's own feedback to learn, and our feedback was lying to them.</p>
+        <p>The most instructive data point is round 5. It was <em>worse</em> than round 1 &mdash; nearly 3x more tool calls despite having four rounds of improvements. Why? Because we'd changed behavior without updating the error messages to match. We had modified how the <code>send</code> command worked (dropping auto-enter), but the error messages and hints still described the old behavior. The agents followed the error messages &mdash; the only teaching channel they trusted &mdash; and the error messages were lying.</p>
 
-        <p>This is a critical trap in AX design. You can't just change behavior and update the docs. Agents don't read docs. You have to update the <em>errors</em> &mdash; the actual runtime feedback that agents use to learn your interface. If your error messages describe a contract that no longer exists, agents will follow the error messages and fail.</p>
-
-        <p>By round 13, the system had stabilized. Every agent succeeded. The average completion time converged to about 90 seconds. The variance between fastest and slowest agent dropped to near zero. The tool wasn't just usable &mdash; it was predictable.</p>
+        <p>This is the critical trap in environment-side tuning. You can't just change behavior and update the docs. Agents don't read docs. You have to update the <em>errors</em> &mdash; the actual runtime feedback that agents use to learn your interface. If your error messages describe a contract that no longer exists, they're a corrupted reward signal, and agent behavior will degrade rather than improve. Round 5 proved it: a misleading environment is worse than no environment tuning at all.</p>
 
         <div class="section-break"></div>
 
         <!-- 6. THE CHECKLIST -->
 
-        <h2>The AX Design Checklist</h2>
+        <h2>The Environment-Side Tuning Checklist</h2>
 
-        <p>If you maintain a developer tool &mdash; any tool that agents will use &mdash; here's what we learned, distilled into universal design principles:</p>
+        <p>If you maintain a developer tool &mdash; any tool that agents will encounter for the first time &mdash; here's what we learned about reducing behavioral variance and making your tool learnable:</p>
 
         <ul class="checklist">
-          <li><strong>Put a working example in every error message.</strong> Your errors are your documentation. Agents don't read READMEs, man pages, or <code>--help</code>. They try, fail, and read the error. Make every error a complete micro-tutorial with a copy-pasteable example.</li>
-          <li><strong>Make state obvious.</strong> If agents can't tell whether your tool is working, waiting, or broken, they'll start killing processes and deleting files to find out. Status endpoints, progress messages, explicit timeouts &mdash; anything that answers "what is happening right now?"</li>
-          <li><strong>Test with N parallel agents.</strong> Single-agent testing misses race conditions, shared-state bugs, and resource collisions. If your tool will be used in CI, in orchestration, or by coding assistants that spawn sub-agents, test the way it'll be used.</li>
-          <li><strong>Watch what agents try first.</strong> Their failed calls are your feature backlog. If 10/10 agents try <code>--name</code>, build <code>--name</code>. If every agent tries to POST JSON and you only accept form data, you know what to change.</li>
-          <li><strong>Default to safe, verbose behavior.</strong> Let agents opt into speed, not out of safety. Fire-and-forget defaults, silent overwrites, and quiet conflict resolution create the confusion that leads to destructive escalation.</li>
-          <li><strong>Design for stateless clients.</strong> Every agent invocation starts from zero. No memory of what happened last time, no learned preferences, no accumulated context. If your tool requires sequential knowledge to operate, persist that knowledge in the tool itself.</li>
-          <li><strong>Persist state that agents need.</strong> Output, session history, last-known-good state &mdash; make it queryable. An agent's process might die before it reads the final result. That data should survive.</li>
-          <li><strong>Never silently change names or state.</strong> Error loudly when there's a conflict. Agents can parse errors and adapt. They cannot detect silent surprises &mdash; and silent surprises compound into the kind of invisible state corruption that makes agents go nuclear.</li>
+          <li><strong>Put a working example in every error message.</strong> Errors are your reward signal. They're the only teaching channel guaranteed to reach the agent. Make every error a precise signal that collapses uncertainty: what went wrong, what to do instead, with a copy-pasteable example.</li>
+          <li><strong>Make state obvious and queryable.</strong> Ambiguity creates variance. If agents can't tell whether your tool is working, waiting, or broken, each agent will form a different hypothesis &mdash; and act on it destructively. Status endpoints, progress messages, and explicit timeouts all reduce ambiguity.</li>
+          <li><strong>Run 10 agents for statistical significance.</strong> One agent tells you if your tool works. Ten agents tell you if behavior converges or scatters. The variance across agents is the signal &mdash; high variance means the environment isn't teaching effectively.</li>
+          <li><strong>Log what agents try first.</strong> Their initial attempts reveal what your interface should look like. If 10/10 agents try <code>--name</code>, build <code>--name</code>. First attempts are the purest signal about expected API shape.</li>
+          <li><strong>Default to feedback-rich behavior.</strong> Safe, verbose defaults act as temperature control &mdash; they constrain agent behavior and force convergence. Fire-and-forget defaults are high temperature: agents receive no signal and scatter. Every silent default is a source of variance.</li>
+          <li><strong>Keep error messages in sync with behavior.</strong> When you change how your tool works, update the errors first, docs second. Stale error messages are a corrupted reward signal &mdash; they make agent behavior worse, not better. Round 5 proved this.</li>
+          <li><strong>Design for zero prior knowledge.</strong> Every agent invocation starts cold. No memory of previous sessions, no learned preferences, no context. Your tool's runtime feedback is the only thing shaping behavior. If your tool requires sequential knowledge to operate, persist that knowledge in the tool itself.</li>
+          <li><strong>Treat your interface as a training environment.</strong> Error messages, defaults, output format, command structure &mdash; these are your tuning knobs. You can't change the model's weights, but you can shape the environment to make any model converge. Measure variance across agents to know if your tuning is working.</li>
         </ul>
 
         <div class="section-break"></div>
 
-        <p>We started this project to solve a narrow problem: letting AI agents run interactive CLI wizards. We ended up discovering something much bigger. The patterns we found &mdash; error-driven learning, destructive escalation, emergent parallel failures, implicit feature discovery, safe defaults &mdash; aren't specific to CLIs. They're fundamental properties of how AI agents interact with any software interface.</p>
+        <p>We started this project to solve a narrow problem: letting AI agents run interactive CLI wizards. We ended up learning something much broader about the relationship between tools and the models that use them. The patterns we found &mdash; error-driven learning, destructive escalation, implicit API discovery, defaults as temperature control, environment-side alignment &mdash; aren't specific to CLIs. They're fundamental properties of how AI agents learn any new interface.</p>
 
-        <p>The next billion users of your developer tools might not be human. Design accordingly.</p>
+        <p>You can't fine-tune a model to know your tool. But you can tune your tool to teach any model. Seventeen versions, zero changes to the agent, 78% fewer calls, and a 9x reduction in behavioral variance. The weights stayed the same. The environment changed. And the behavior followed.</p>
 
         <div class="section-break"></div>
 
