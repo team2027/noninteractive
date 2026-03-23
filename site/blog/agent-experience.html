@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Experience Is the New UX — noninteractive</title>
+  <meta name="description" content="We ran 130 AI agents through an interactive CLI wizard. The results changed how we think about tool design.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬛</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    :root {
+      --bg: #fafaf8;
+      --fg: #1a1a18;
+      --dim: #6b6966;
+      --border: #e0ddd8;
+      --surface: #f0eee9;
+      --terminal-bg: #1a1a18;
+      --terminal-fg: #e8e4dc;
+      --terminal-dim: #8a8680;
+    }
+
+    body {
+      font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      position: relative;
+    }
+
+    /* Grain overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.02;
+      z-index: 1000;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 1024 1024' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    }
+
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 20px 0;
+      background: rgba(250, 250, 248, 0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    nav .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--fg);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 14px;
+      color: var(--dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--fg);
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Article header */
+    .article-header {
+      padding: 160px 0 60px;
+    }
+
+    .article-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      color: var(--dim);
+      margin-bottom: 24px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .article-meta span {
+      display: inline-block;
+    }
+
+    .article-meta .dot {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--dim);
+    }
+
+    .article-header h1 {
+      font-size: clamp(32px, 5vw, 44px);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+      margin-bottom: 20px;
+    }
+
+    .article-header .subtitle {
+      font-size: 20px;
+      color: var(--dim);
+      line-height: 1.5;
+      max-width: 600px;
+    }
+
+    /* Article body */
+    .article-body {
+      padding-bottom: 100px;
+    }
+
+    .article-body h2 {
+      font-size: clamp(22px, 4vw, 28px);
+      font-weight: 600;
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+      margin-top: 56px;
+      margin-bottom: 20px;
+    }
+
+    .article-body h3 {
+      font-size: 19px;
+      font-weight: 600;
+      margin-top: 40px;
+      margin-bottom: 12px;
+    }
+
+    .article-body p {
+      font-size: 17px;
+      line-height: 1.75;
+      color: var(--fg);
+      margin-bottom: 20px;
+    }
+
+    .article-body p.dim {
+      color: var(--dim);
+    }
+
+    .article-body strong {
+      font-weight: 600;
+    }
+
+    .article-body a {
+      color: var(--fg);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      text-decoration-color: var(--border);
+      transition: text-decoration-color 0.2s;
+    }
+
+    .article-body a:hover {
+      text-decoration-color: var(--fg);
+    }
+
+    .article-body ul, .article-body ol {
+      margin-bottom: 20px;
+      padding-left: 24px;
+    }
+
+    .article-body li {
+      font-size: 17px;
+      line-height: 1.75;
+      margin-bottom: 8px;
+    }
+
+    /* Blockquote */
+    blockquote {
+      margin: 32px 0;
+      padding: 24px 28px;
+      background: var(--terminal-bg);
+      border-radius: 8px;
+      border: 1px solid #2a2a28;
+    }
+
+    blockquote p {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px !important;
+      line-height: 1.7 !important;
+      color: var(--terminal-fg) !important;
+      margin-bottom: 0 !important;
+    }
+
+    blockquote p .comment {
+      color: var(--terminal-dim);
+    }
+
+    /* Inline code */
+    .article-body code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      background: var(--surface);
+      padding: 2px 7px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    /* Code blocks */
+    .terminal {
+      background: var(--terminal-bg);
+      border: 1px solid #2a2a28;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+      margin: 28px 0;
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 20px;
+      border-bottom: 1px solid #2a2a28;
+      background: #141413;
+    }
+
+    .terminal-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #3d3b37;
+    }
+
+    .terminal-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--terminal-dim);
+      margin-left: 8px;
+    }
+
+    .terminal-body {
+      padding: 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      overflow-x: auto;
+    }
+
+    .terminal-body .line {
+      white-space: pre;
+    }
+
+    .terminal-body .cmd {
+      color: var(--terminal-fg);
+    }
+
+    .terminal-body .cmd::before {
+      content: '$ ';
+      color: var(--terminal-dim);
+    }
+
+    .terminal-body .output {
+      color: var(--terminal-dim);
+    }
+
+    .terminal-body .comment {
+      color: #5a5750;
+    }
+
+    .terminal-body .highlight {
+      color: var(--terminal-fg);
+    }
+
+    .terminal-body .spacer {
+      height: 12px;
+    }
+
+    /* Data table */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 28px 0;
+      font-size: 15px;
+    }
+
+    .data-table thead {
+      border-bottom: 2px solid var(--border);
+    }
+
+    .data-table th {
+      text-align: left;
+      padding: 12px 16px;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.03em;
+      color: var(--dim);
+    }
+
+    .data-table td {
+      padding: 12px 16px;
+      vertical-align: top;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td:first-child {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+    }
+
+    .data-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .data-table .mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+    }
+
+    .data-table .highlight-row {
+      background: var(--surface);
+    }
+
+    .data-table .worst-row {
+      background: #fef6f0;
+    }
+
+    /* Section divider */
+    .section-break {
+      width: 48px;
+      height: 1px;
+      background: var(--border);
+      margin: 56px 0;
+    }
+
+    /* Checklist */
+    .checklist {
+      list-style: none;
+      padding-left: 0;
+      margin: 24px 0;
+    }
+
+    .checklist li {
+      position: relative;
+      padding-left: 28px;
+      margin-bottom: 16px;
+      font-size: 17px;
+      line-height: 1.65;
+    }
+
+    .checklist li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 8px;
+      width: 14px;
+      height: 14px;
+      border: 1.5px solid var(--dim);
+      border-radius: 3px;
+    }
+
+    .checklist li strong {
+      font-weight: 600;
+    }
+
+    /* Back link */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      color: var(--dim);
+      text-decoration: none;
+      transition: color 0.2s;
+      margin-bottom: 0;
+    }
+
+    .back-link:hover {
+      color: var(--fg);
+    }
+
+    /* Footer */
+    footer {
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    footer p {
+      font-size: 13px;
+      color: var(--dim);
+    }
+
+    footer a {
+      color: var(--dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    footer a:hover {
+      color: var(--fg);
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .nav-links {
+        gap: 16px;
+      }
+
+      .nav-links a {
+        font-size: 13px;
+      }
+
+      .article-header {
+        padding: 120px 0 40px;
+      }
+
+      .article-body h2 {
+        margin-top: 40px;
+      }
+
+      .terminal-body {
+        font-size: 11px;
+        padding: 16px;
+      }
+
+      .data-table {
+        font-size: 13px;
+      }
+
+      .data-table th, .data-table td {
+        padding: 8px 10px;
+      }
+
+      .footer-content {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="container">
+      <a href="/" class="nav-logo">noninteractive</a>
+      <ul class="nav-links">
+        <li><a href="/blog/agent-experience.html">Blog</a></li>
+        <li><a href="https://github.com/team2027/cli" target="_blank">GitHub</a></li>
+        <li><a href="https://www.npmjs.com/package/noninteractive" target="_blank">npm</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <article>
+    <div class="container">
+
+      <header class="article-header">
+        <div class="article-meta">
+          <span>March 2026</span>
+          <span class="dot"></span>
+          <span>10 min read</span>
+        </div>
+        <h1>Agent Experience Is the New UX</h1>
+        <p class="subtitle">We ran 130 AI agents through an interactive CLI wizard. The results changed how we think about tool design.</p>
+      </header>
+
+      <div class="article-body">
+
+        <!-- 1. THE HOOK -->
+
+        <p>Round 5, Thursday afternoon. Ten AI agents, all running <code>eslint --init</code> in parallel. No documentation, no skill file, no guidance beyond a one-sentence prompt: <em>"use npx noninteractive to complete npx eslint --init."</em></p>
+
+        <p>They discovered <code>noninteractive</code> from <code>--help</code>, figured out the API on their own, and started completing the wizard. Some agents nailed it in ten minutes flat. Then the killing started.</p>
+
+        <blockquote>
+          <p>agent 3 ran <span class="comment">ps aux | grep create-config</span>, found pid 57278 &mdash; a perfectly healthy ptybridge process belonging to another agent. Thought: "these stale processes could be interfering." Ran <span class="comment">kill 57278 57248 57247</span>. Three agents just lost their sessions.</p>
+        </blockquote>
+
+        <p>What followed was a death spiral. Agent A kills agent B's ptybridge. Agent B sees its session is dead, assumes something is broken, runs <code>ps aux</code>, finds agent C's processes, kills those too. Agent C does the same to agent D. Meanwhile, agents 1 and 5 finished the task in ten minutes, blissfully ignorant of the carnage. They never once ran <code>list</code>. They never looked at other sessions. They just did their job.</p>
+
+        <p>Round 5 was our worst round. Average 86 tool calls, ten minutes per agent. But it taught us more about designing tools for AI agents than any user study ever taught us about designing for humans.</p>
+
+        <div class="section-break"></div>
+
+        <!-- 2. WHAT IS AX? -->
+
+        <h2>What Is Agent Experience (AX)?</h2>
+
+        <p>User Experience (UX) is a solved vocabulary. We know what it means to design for humans: intuitive navigation, clear visual hierarchy, helpful onboarding. But what happens when the user holding the keyboard isn't human?</p>
+
+        <p><strong>Agent Experience (AX)</strong> is how well a tool works when the user is an AI agent. It's the new design surface that matters as LLMs become the primary consumers of developer tooling. And it turns out, almost everything we know about UX is wrong for AX.</p>
+
+        <p>Humans read documentation before starting a task. Agents run <code>--help</code> and then immediately guess the command they need. Some don't even bother with <code>--help</code> &mdash; they just try the most plausible invocation and learn from the error.</p>
+
+        <p>Humans see visual highlights: bold text, color changes, interactive cursors. Agents see stripped plain text, because ANSI escape codes get removed before the output reaches the model. A Yes/No toggle that's perfectly clear to a human &mdash; bright white highlight on the selected option &mdash; becomes an inscrutable <code>&rsaquo; No / Yes</code> to an agent.</p>
+
+        <p>Humans type one command, read the output, think, type another. Agents chain ten commands in milliseconds, running <code>send</code> before <code>read</code> has returned, firing off <code>ps aux</code> and <code>kill</code> commands at processes they don't own.</p>
+
+        <p>Humans recover from errors through intuition and context. Agents recover through error messages &mdash; and <em>only</em> through error messages. If your error says "invalid argument" without showing what a valid argument looks like, the agent will try ten more invalid variations before giving up.</p>
+
+        <p>AX is the new frontier. As AI agents become the primary users of developer tools &mdash; running CI pipelines, configuring projects, managing infrastructure &mdash; the tools need to be designed for how agents actually behave, not how humans expect them to.</p>
+
+        <div class="section-break"></div>
+
+        <!-- 3. METHODOLOGY -->
+
+        <h2>The Methodology: ax-eval</h2>
+
+        <p>We needed a way to systematically test agent experience. Not a benchmark. Not a static eval. Something that captures the chaos of real agent behavior at scale. We called it <strong>ax-eval</strong>.</p>
+
+        <p>The setup is simple: spawn 10 AI agents in parallel, each with an identical one-sentence prompt. No documentation, no skill file, no examples. Just: <em>"use npx noninteractive to complete npx eslint --init, and create a valid eslint config."</em> Then watch what happens.</p>
+
+        <p>Each agent runs in its own Claude Code session with full shell access. They can install packages, read files, run commands, kill processes &mdash; anything a developer could do. They share the same machine, which means they share the same <code>~/.noninteractive/sessions/</code> directory. This is intentional. Real agents in real environments will collide.</p>
+
+        <p>After each round, we collect every transcript. We analyze the patterns &mdash; what commands agents tried first, where they got stuck, what caused cascading failures. Then we fix the tool, ship a new version, and run another round.</p>
+
+        <p>Thirteen rounds. 130 total agent runs. 17 versions shipped, from 0.3.17 to 0.3.34. Each round revealed something we didn't expect, and each fix was validated by the next ten agents. No human beta testers. No surveys. Just agents, failing and succeeding, over and over.</p>
+
+        <p>The transcripts are brutal in their honesty. Agents don't politely work around your bugs. They expose every sharp edge, every ambiguous error message, every missing feature &mdash; usually within the first 30 seconds.</p>
+
+        <div class="section-break"></div>
+
+        <!-- 4. THE FIVE INSIGHTS -->
+
+        <h2>The Five Insights</h2>
+
+        <h3>1. Error messages are the primary teaching channel</h3>
+
+        <p>Here's a surprising data point: in later rounds, 0 out of 10 agents ran <code>--help</code> first. Zero. They skipped documentation entirely and went straight to guessing the command.</p>
+
+        <p>This makes sense when you think about it. An agent's workflow is: form a hypothesis about the command syntax, try it, read the error, adjust. The error message <em>is</em> the documentation. It's the only thing the agent reads before its second attempt.</p>
+
+        <p>Early versions of <code>noninteractive</code> had errors like:</p>
+
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <span class="terminal-title">before</span>
+          </div>
+          <div class="terminal-body">
+            <div class="line output">Error: unknown option '--name'</div>
+          </div>
+        </div>
+
+        <p>Agents would get this and try <code>-n</code>, then <code>--session-name</code>, then <code>--id</code>. Five attempts to discover a flag that didn't exist yet. We changed every error to include a working example:</p>
+
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <span class="terminal-title">after</span>
+          </div>
+          <div class="terminal-body">
+            <div class="line output">Error: unknown option '--name'</div>
+            <div class="line output">hint: to start a named session, use positional args:</div>
+            <div class="line highlight">  noninteractive start eslint npx eslint --init</div>
+          </div>
+        </div>
+
+        <p>100% correction rate on next attempt. Every single agent read the hint, used the example, and moved on. The pattern was so reliable that we started thinking of error messages as micro-tutorials &mdash; each one a complete lesson in the correct API surface.</p>
+
+        <p>Another example: agents consistently tried <code>start --name X -- npx eslint --init</code> with a <code>--</code> separator, borrowing syntax from <code>docker run</code> and <code>npm run</code>. We added a targeted hint: <em>"the -- separator is not needed. just put the command after the flags."</em> Immediate fix, every time.</p>
+
+        <h3>2. Shell expansion doesn't work in agent environments</h3>
+
+        <p>Interactive CLI wizards use arrow keys to navigate menus. An agent needs to send these key codes programmatically. The natural way to express "down arrow" in a shell is ANSI-C quoting: <code>$'\x1b[B'</code>.</p>
+
+        <p>Every agent tried this. Every agent failed.</p>
+
+        <p>The problem: AI agents don't run commands in a real shell. They use a tool that passes a command string to an execution environment. The Bash tool in Claude Code, for example, passes the string literally &mdash; no ANSI-C expansion. So <code>$'\x1b[B'</code> arrives as the literal characters <code>$'\x1b[B'</code>, not an escape sequence.</p>
+
+        <p>This is invisible to the agent. It sends what looks like the right command, gets no feedback that the escape failed, and concludes the session is broken. Cue the escalation: more aggressive key codes, raw hex, even attempts to <code>echo -e</code> into a pipe.</p>
+
+        <p>The fix was simple: we added client-side escape parsing. Regular double-quoted strings with <code>\x1b</code> and <code>\n</code> sequences get parsed by <code>noninteractive</code> itself, no shell expansion needed. <code>"\x1b[B"</code> just works.</p>
+
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+          </div>
+          <div class="terminal-body">
+            <div class="line comment"># what agents tried (doesn't work)</div>
+            <div class="line cmd">noninteractive send eslint $'\x1b[B'</div>
+            <div class="line spacer"></div>
+            <div class="line comment"># what works everywhere</div>
+            <div class="line cmd">noninteractive send eslint "\x1b[B"</div>
+          </div>
+        </div>
+
+        <p>The lesson: never assume your users have a real shell. If you accept escape sequences, parse them yourself.</p>
+
+        <h3>3. Agents are destructive when confused</h3>
+
+        <p>When an agent encounters a session that appears stuck &mdash; a spinner that never resolves, output that doesn't change &mdash; it doesn't wait patiently. It escalates.</p>
+
+        <p>The escalation ladder looks like this: first, the agent tries sending Enter a few times. Then it tries Ctrl+C. Then it stops the session and starts a new one. Then it runs <code>ps aux | grep ptybridge</code> and starts killing processes. Then <code>pkill -f ptybridge</code>. Then <code>rm -rf ~/.noninteractive/sessions/</code>. We watched one agent attempt to <code>kill -9</code> a system process.</p>
+
+        <p>In round 5, this destructive behavior combined with parallel execution to create the death spiral. Ten agents sharing a machine, each one capable of killing the others' sessions. The ones that finished quickly were fine. The ones that got stuck became serial killers.</p>
+
+        <p>We attacked this from multiple angles. Better output stripping so spinners become real content sooner. The <code>--wait</code> flag so agents block until there's actual new output instead of polling in a tight loop. Anti-interference warnings when an agent tries to access another agent's session. And clearer session status so "waiting for output" doesn't look like "broken."</p>
+
+        <p>The deeper lesson: agents have no patience and no restraint. If something seems broken, they will take increasingly destructive actions to fix it. Your tool needs to either never appear stuck, or clearly communicate "I'm working, hold on."</p>
+
+        <h3>4. Visual markers must survive ANSI stripping</h3>
+
+        <p>The <code>eslint --init</code> wizard presents Yes/No toggles. In a real terminal, the selected option is bold and underlined. It's obvious to a human which one is active. But after ANSI stripping, both options look identical:</p>
+
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <span class="terminal-title">stripped output</span>
+          </div>
+          <div class="terminal-body">
+            <div class="line output">&rsaquo; No / Yes</div>
+          </div>
+        </div>
+
+        <p>Which is selected? Agents couldn't tell. 7 out of 10 agents in early rounds accidentally toggled the selection by sending an arrow key "just to check," flipping "Yes" to "No" without realizing it. They thought they were reading state; they were mutating it.</p>
+
+        <p>The fix: instead of simply deleting ANSI bold and underline codes during stripping, we convert them to markdown-style markers. Bold becomes <code>**text**</code>. The output now reads:</p>
+
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <span class="terminal-title">with markers</span>
+          </div>
+          <div class="terminal-body">
+            <div class="line output">&rsaquo; No / **Yes**</div>
+          </div>
+        </div>
+
+        <p>Agents immediately understood the convention. They recognized <code>**Yes**</code> as the active selection and stopped sending unnecessary arrow keys. The information that was in the visual formatting &mdash; which option is highlighted &mdash; now survived the journey from terminal to agent.</p>
+
+        <p>This principle applies everywhere ANSI codes carry semantic meaning. Progress bars, menu selections, status indicators &mdash; if the formatting <em>means</em> something, it needs a text-based equivalent that survives stripping.</p>
+
+        <h3>5. Agents want --name and --cwd</h3>
+
+        <p>Across rounds 8 and 9, we watched something remarkable: 10 out of 10 agents tried flags that didn't exist.</p>
+
+        <p>Every single agent tried <code>--name</code> to name their session. Every single agent tried <code>--cwd</code> to set the working directory. These weren't in the help text. They weren't in any documentation. The agents just assumed they should exist, because of course a session-management tool should let you name sessions and set working directories.</p>
+
+        <p>We implemented both flags. The next round: 10/10 agents completed the task on their first try with zero errors on the start command. The agents had been telling us our API was wrong, and the signal was what they tried before reading any docs.</p>
+
+        <p>This is a powerful product development insight. When every single agent independently tries the same non-existent feature, it's not a bug in the agents. It's a missing feature in your tool. Agent behavior is implicit user research at scale.</p>
+
+        <div class="section-break"></div>
+
+        <!-- 5. THE DATA -->
+
+        <h2>The Data</h2>
+
+        <p>Numbers tell the convergence story better than anecdotes. Here are the key rounds:</p>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Round</th>
+              <th>Version</th>
+              <th>Avg Calls</th>
+              <th>Avg Time</th>
+              <th>Key Fix</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td class="mono">0.3.16</td>
+              <td>31</td>
+              <td>3:00</td>
+              <td>Baseline &mdash; no agent-specific design</td>
+            </tr>
+            <tr class="worst-row">
+              <td>5</td>
+              <td class="mono">0.3.22</td>
+              <td>86</td>
+              <td>10:00</td>
+              <td>Death spiral &mdash; worst round</td>
+            </tr>
+            <tr class="highlight-row">
+              <td>7</td>
+              <td class="mono">0.3.24</td>
+              <td>23</td>
+              <td>2:07</td>
+              <td>First clean round &mdash; zero interference</td>
+            </tr>
+            <tr>
+              <td>9</td>
+              <td class="mono">0.3.28</td>
+              <td>21</td>
+              <td>1:45</td>
+              <td>--name/--cwd added</td>
+            </tr>
+            <tr class="highlight-row">
+              <td>13</td>
+              <td class="mono">0.3.34</td>
+              <td>18.8</td>
+              <td>1:25</td>
+              <td>Converged &mdash; all agents succeed</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p>From round 1 to round 13: <strong>78% fewer tool calls</strong> and <strong>86% faster completion</strong>. From chaos to convergence in 13 iterations.</p>
+
+        <p>But the most interesting data point is round 5. It was <em>worse</em> than round 1 &mdash; nearly 3x more tool calls, 3x longer &mdash; despite having three rounds of fixes already applied. Why? Because we'd changed behavior (dropped auto-enter on send) without considering how agents would adapt to the change. The agents had learned patterns from the old behavior, and our "improvement" broke those patterns.</p>
+
+        <p>This is a trap in AX design: changes that are objectively better for long-term usability can devastate short-term agent performance. Agents form habits fast. If you change the contract, you need to guide the transition through error messages and hints, not just update the docs (which agents don't read anyway).</p>
+
+        <p>By round 13, the system had stabilized. Every agent succeeded. The average completion time converged to about 90 seconds. The variance between fastest and slowest agent dropped to near zero. The tool wasn't just usable &mdash; it was predictable.</p>
+
+        <div class="section-break"></div>
+
+        <!-- 6. THE CHECKLIST -->
+
+        <h2>The AX Design Checklist</h2>
+
+        <p>If you maintain a CLI tool &mdash; or any developer tool that agents will use &mdash; here's what we learned, distilled into actionable design principles:</p>
+
+        <ul class="checklist">
+          <li><strong>Your error messages are your docs.</strong> Include a working example in every single error. Agents don't run <code>--help</code>. They try, fail, and read the error. Make that error a complete micro-tutorial.</li>
+          <li><strong>Don't rely on shell features.</strong> Parse escape sequences yourself. ANSI-C quoting, tilde expansion, glob patterns &mdash; none of it is guaranteed to work in agent environments.</li>
+          <li><strong>Strip ANSI thoughtfully.</strong> Don't just delete formatting codes. Convert bold and underline to text markers like <code>**markdown**</code>. If formatting carries meaning, preserve that meaning in plain text.</li>
+          <li><strong>Test with 10 agents, not 1.</strong> Parallel execution reveals race conditions, resource conflicts, and interference patterns that a single agent will never hit. Shared state is the enemy.</li>
+          <li><strong>Agents want flags you didn't build.</strong> Watch what they try before reading any docs &mdash; that's your implicit feature roadmap. If 10/10 agents try <code>--name</code>, build <code>--name</code>.</li>
+          <li><strong>Default to the safe option.</strong> Make <code>--wait</code> the default, not fire-and-forget. Agents will poll in tight loops if you make them manage their own timing.</li>
+          <li><strong>Exited sessions should still be readable.</strong> Persist output to files. An agent's session might exit before it reads the final output. That data should survive.</li>
+          <li><strong>Never silently rename or overwrite.</strong> If a session name is taken, error loudly. Silent conflict resolution creates invisible bugs that agents can't diagnose.</li>
+        </ul>
+
+        <div class="section-break"></div>
+
+        <p>We started this project to let AI agents run interactive CLI wizards. We ended up learning something bigger: the next generation of developer tools needs to be designed for users that don't read documentation, can't see formatting, act in milliseconds, and escalate destructively when confused.</p>
+
+        <p>The next billion users of your CLI might not be human. Design accordingly.</p>
+
+        <div class="section-break"></div>
+
+        <a href="/" class="back-link">&larr; Back to noninteractive</a>
+
+      </div>
+    </div>
+  </article>
+
+  <footer>
+    <div class="container">
+      <div class="footer-content">
+        <p>&copy; <a href="https://2027.dev">2027.dev</a> &mdash; San Francisco, CA</p>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
