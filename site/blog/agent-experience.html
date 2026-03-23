@@ -508,7 +508,7 @@
 
         <!-- 1. THE HOOK -->
 
-        <p>Round 5, Thursday afternoon. Ten AI agents, all running <code>eslint --init</code> through our CLI wrapper. No documentation injected, no skill file, no guidance beyond a one-sentence prompt: <em>"use npx noninteractive to complete npx eslint --init."</em></p>
+        <p>Round 5, Thursday afternoon. Ten AI agents, all trying to set up ESLint &mdash; a task that requires navigating an interactive terminal wizard with arrow keys, toggles, and confirmation prompts. The tool they were using: <a href="/">noninteractive</a>, a CLI that wraps interactive commands in a pseudo-terminal and lets agents send keystrokes and read output programmatically. Think of it as a remote control for terminal wizards. No documentation injected, no skill file, no guidance beyond a one-sentence prompt: <em>"use npx noninteractive to complete npx eslint --init."</em></p>
 
         <p>They'd never seen this tool before. It wasn't in their training data. Every interaction was a cold start &mdash; try something, read the error, adjust. One-shot reinforcement learning against a completely unknown interface. Some agents nailed it in ten minutes flat. Then the killing started.</p>
 
@@ -626,7 +626,7 @@
 
         <h3>4. Safe defaults reduce behavioral variance</h3>
 
-        <p>Early versions of our tool had a <code>send</code> command that fired and forgot &mdash; it sent input to the session and returned immediately, with no indication of what happened next. Agents had to manually call <code>read</code> afterward to see the result. This was "fast" by design. It was also the single biggest source of behavioral variance across agents.</p>
+        <p>Our tool has two key commands: <code>send</code> (type keystrokes into the terminal) and <code>read</code> (see what's on screen). Early versions had <code>send</code> fire and forget &mdash; it delivered the keystrokes and returned immediately, with no indication of what happened next. Agents had to manually call <code>read</code> afterward to see the result. This was "fast" by design. It was also the single biggest source of behavioral variance across agents.</p>
 
         <p>Some agents figured out the send-then-read pattern quickly. Others sent multiple keypresses blind, confirming wrong options, skipping prompts, flying completely through the wizard without ever seeing what was on screen. The spread was enormous. Same tool, same prompt, wildly different strategies &mdash; because the default gave agents no feedback to converge on.</p>
 
