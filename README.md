@@ -96,7 +96,7 @@ npx skills add https://noninteractive.org
 
 AI coding agents can run shell commands, but they can't interact with prompts that wait for user input. This tool bridges that gap — the agent starts the command, reads the output, decides what to send, and completes the flow autonomously.
 
-## DevTool Arena
+## Agent Arena
 
 This tool powers [2027.dev/arena](https://2027.dev/arena) — a benchmark that sends Claude Code through every devtool's getting-started guide to measure how agent-friendly they are. If an agent can't navigate your product, it won't use it.
 

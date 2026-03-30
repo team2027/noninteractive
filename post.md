@@ -36,7 +36,7 @@ The PTY is allocated by a small Go binary (using github.com/creack/pty), cross-c
 
 **Why this matters:**
 
-Every devtool has a getting-started flow. Most of them are interactive. If an AI agent can't navigate your setup wizard, it can't use your product. We're using this tool to power [DevTool Arena](https://2027.dev/arena) — a benchmark that sends Claude Code through every devtool's getting-started guide to measure how agent-friendly they are.
+Every devtool has a getting-started flow. Most of them are interactive. If an AI agent can't navigate your setup wizard, it can't use your product. We're using this tool to power [Agent Arena](https://2027.dev/arena) — a benchmark that sends Claude Code through every devtool's getting-started guide to measure how agent-friendly they are.
 
 The age of "just read the docs" is ending. By 2027, the majority of your product's "users" will be autonomous agents setting up on behalf of developers. If your onboarding isn't machine-navigable, you're invisible.
 
