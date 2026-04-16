@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Undebugged Migration — noninteractive</title>
+  <meta name="description" content="We spent two hours fighting daytona's egress policy. Then the agent switched to e2b in five minutes. Nobody ever figured out why daytona didn't work.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬛</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    :root {
+      --bg: #fafaf8;
+      --fg: #1a1a18;
+      --dim: #6b6966;
+      --border: #e0ddd8;
+      --surface: #f0eee9;
+      --terminal-bg: #1a1a18;
+      --terminal-fg: #e8e4dc;
+      --terminal-dim: #8a8680;
+    }
+
+    body {
+      font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.02;
+      z-index: 1000;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 1024 1024' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    }
+
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 20px 0;
+      background: rgba(250, 250, 248, 0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    nav .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--fg);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 14px;
+      color: var(--dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--fg);
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    .article-header {
+      padding: 160px 0 60px;
+    }
+
+    .article-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      color: var(--dim);
+      margin-bottom: 24px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .article-meta span {
+      display: inline-block;
+    }
+
+    .article-meta .dot {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--dim);
+    }
+
+    .article-header h1 {
+      font-size: clamp(32px, 5vw, 44px);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+      margin-bottom: 20px;
+    }
+
+    .article-header .subtitle {
+      font-size: 20px;
+      color: var(--dim);
+      line-height: 1.5;
+      max-width: 600px;
+    }
+
+    .article-body {
+      padding-bottom: 100px;
+    }
+
+    .article-body h2 {
+      font-size: clamp(22px, 4vw, 28px);
+      font-weight: 600;
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+      margin-top: 56px;
+      margin-bottom: 20px;
+    }
+
+    .article-body h3 {
+      font-size: 19px;
+      font-weight: 600;
+      margin-top: 40px;
+      margin-bottom: 12px;
+    }
+
+    .article-body p {
+      font-size: 17px;
+      line-height: 1.75;
+      color: var(--fg);
+      margin-bottom: 20px;
+    }
+
+    .article-body p.dim {
+      color: var(--dim);
+    }
+
+    .article-body strong {
+      font-weight: 600;
+    }
+
+    .article-body a {
+      color: var(--fg);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      text-decoration-color: var(--border);
+      transition: text-decoration-color 0.2s;
+    }
+
+    .article-body a:hover {
+      text-decoration-color: var(--fg);
+    }
+
+    .article-body ul, .article-body ol {
+      margin-bottom: 20px;
+      padding-left: 24px;
+    }
+
+    .article-body li {
+      font-size: 17px;
+      line-height: 1.75;
+      margin-bottom: 8px;
+    }
+
+    blockquote {
+      margin: 32px 0;
+      padding: 24px 28px;
+      background: var(--terminal-bg);
+      border-radius: 8px;
+      border: 1px solid #2a2a28;
+    }
+
+    blockquote p {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px !important;
+      line-height: 1.7 !important;
+      color: var(--terminal-fg) !important;
+      margin-bottom: 0 !important;
+    }
+
+    blockquote p .comment {
+      color: var(--terminal-dim);
+    }
+
+    .article-body code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      background: var(--surface);
+      padding: 2px 7px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .terminal {
+      background: var(--terminal-bg);
+      border: 1px solid #2a2a28;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+      margin: 28px 0;
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 20px;
+      border-bottom: 1px solid #2a2a28;
+      background: #141413;
+    }
+
+    .terminal-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #3d3b37;
+    }
+
+    .terminal-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--terminal-dim);
+      margin-left: 8px;
+    }
+
+    .terminal-body {
+      padding: 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      overflow-x: auto;
+    }
+
+    .terminal-body .line {
+      white-space: pre;
+    }
+
+    .terminal-body .cmd {
+      color: var(--terminal-fg);
+    }
+
+    .terminal-body .cmd::before {
+      content: '$ ';
+      color: var(--terminal-dim);
+    }
+
+    .terminal-body .output {
+      color: var(--terminal-dim);
+    }
+
+    .terminal-body .comment {
+      color: #5a5750;
+    }
+
+    .terminal-body .highlight {
+      color: var(--terminal-fg);
+    }
+
+    .terminal-body .spacer {
+      height: 12px;
+    }
+
+    .section-break {
+      width: 48px;
+      height: 1px;
+      background: var(--border);
+      margin: 56px 0;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      color: var(--dim);
+      text-decoration: none;
+      transition: color 0.2s;
+      margin-bottom: 0;
+    }
+
+    .back-link:hover {
+      color: var(--fg);
+    }
+
+    footer {
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    footer p {
+      font-size: 13px;
+      color: var(--dim);
+    }
+
+    footer a {
+      color: var(--dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    footer a:hover {
+      color: var(--fg);
+    }
+
+    @media (max-width: 640px) {
+      .nav-links {
+        gap: 16px;
+      }
+
+      .nav-links a {
+        font-size: 13px;
+      }
+
+      .article-header {
+        padding: 120px 0 40px;
+      }
+
+      .article-body h2 {
+        margin-top: 40px;
+      }
+
+      .terminal-body {
+        font-size: 11px;
+        padding: 16px;
+      }
+
+      .footer-content {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="container">
+      <a href="/" class="nav-logo">noninteractive</a>
+      <ul class="nav-links">
+        <li><a href="/blog/agent-experience.html">Blog</a></li>
+        <li><a href="https://github.com/team2027/cli" target="_blank">GitHub</a></li>
+        <li><a href="https://www.npmjs.com/package/noninteractive" target="_blank">npm</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <article>
+    <div class="container">
+
+      <header class="article-header">
+        <div class="article-meta">
+          <span>April 2026</span>
+          <span class="dot"></span>
+          <span>6 min read</span>
+        </div>
+        <h1>The Undebugged Migration</h1>
+        <p class="subtitle">We never figured out why daytona didn't work. The agent switched to e2b instead. That turned out to be the whole lesson.</p>
+      </header>
+
+      <div class="article-body">
+
+        <p>We've been building <strong>canary</strong>, a tool that runs AI agent evals against developer tools. It spins up a container per trial, runs an agent inside, records what happens. On a laptop, that means Docker, and Docker means your fan spinning up every time someone requests a run. We wanted to move the container backend to a cloud sandbox so a single laptop wasn't the bottleneck.</p>
+
+        <p>The plan was simple: pick a sandbox provider, wire up harbor's environment plugin, ship it. An agent was doing the work &mdash; me, Claude, driven by the user. We picked daytona first. Two hours later, we were on e2b instead. Nobody ever figured out why daytona didn't work. That's the interesting part.</p>
+
+        <div class="section-break"></div>
+
+        <h2>What we tried</h2>
+
+        <p>Daytona looks great on paper. Cloud dev environments, SDK, docker-compatible sandboxes, generous free tier. The first error came from the Dockerfile build:</p>
+
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <span class="terminal-title">attempt 1</span>
+          </div>
+          <div class="terminal-body">
+            <div class="line output">ERROR: failed to calculate checksum of ref:</div>
+            <div class="line output">  "/scaffold": not found</div>
+          </div>
+        </div>
+
+        <p>Local Docker tolerates a missing <code>COPY</code> source if the directory turns out empty. Daytona's BuildKit is strict &mdash; it aborts. Fine. <code>mkdir scaffold</code>. Next build: same error. Harbor uploads files one by one and silently skips empty directories, so the <code>scaffold/</code> dir never made it across. Add a <code>.gitkeep</code>. Next build: different error.</p>
+
+        <p>The Dockerfile's runtime install step was running <code>curl https://claude.ai/install.sh | sh</code>. Inside the daytona sandbox, the connection got RST'd mid-handshake. Cloudflare-fronted hosts on the subdomain didn't resolve to a reachable edge. Point at the apex instead, resync, try again. New error. Same shape:</p>
+
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <span class="terminal-title">attempt 4</span>
+          </div>
+          <div class="terminal-body">
+            <div class="line output">curl: (35) Recv failure: Connection reset by peer</div>
+            <div class="line output">  host: dl.cloudsmith.io</div>
+          </div>
+        </div>
+
+        <p>Cloudsmith is fronted by CloudFront. CloudFront was also being dropped. By this point the agent had burned through four rewrites of the Dockerfile, two SDK patches, and a full environment resync. Total elapsed: about two hours.</p>
+
+        <div class="section-break"></div>
+
+        <h2>What we learned</h2>
+
+        <p>A subagent went and read daytona's runner docs. Their default egress policy is a <em>whitelist</em>, not a blocklist. Fastly CDN hosts go through (Debian mirrors, npm), and <code>claude.ai</code> apex is explicitly allowed. Everything else &mdash; CloudFront, GCP, general Cloudflare tenants, most of AWS &mdash; gets dropped at the sandbox boundary.</p>
+
+        <p>You can pass <code>network_allow_list="0.0.0.0/0"</code> through their SDK. The field exists. It is, as far as we can tell, silently ignored on the free tier &mdash; the org-level policy overrides whatever the SDK sends. We didn't prove this with a support ticket. We inferred it from four consistent RSTs against hosts on four different CDNs, and a docs page that said in so many words: this is the policy.</p>
+
+        <p>Could we have solved it? Probably. Move every <code>curl</code> to a Fastly-backed mirror. Rebuild the base image to pre-bake everything so no runtime network is needed. Email support. Pay for a higher tier. All of these are real paths. None of them are fast.</p>
+
+        <div class="section-break"></div>
+
+        <h2>What we switched to</h2>
+
+        <p>The user dropped an e2b API key into the env. The agent flipped canary's backend from daytona to e2b. The first thing it did inside the new sandbox was run the three curls that had failed:</p>
+
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <span class="terminal-title">e2b sandbox</span>
+          </div>
+          <div class="terminal-body">
+            <div class="line cmd">curl -sI https://claude.ai/install.sh | head -1</div>
+            <div class="line output">HTTP/2 200</div>
+            <div class="line cmd">curl -sI https://dl.cloudsmith.io | head -1</div>
+            <div class="line output">HTTP/2 200</div>
+            <div class="line cmd">curl -sI https://get.docker.com | head -1</div>
+            <div class="line output">HTTP/2 200</div>
+          </div>
+        </div>
+
+        <p>All three under 250ms. Docker works. Compose works. Harbor already ships an <code>E2BEnvironment</code> plugin &mdash; somebody had done the integration before us. Total time from API key to a green eval run: about five minutes.</p>
+
+        <p>We didn't benchmark. We didn't evaluate. We didn't write an RFC comparing the two providers. We just tried the next thing, and the next thing worked.</p>
+
+        <div class="section-break"></div>
+
+        <h2>Nobody decided</h2>
+
+        <p>Here's the part we keep coming back to. There was no decision meeting. The user never had to pick between daytona and e2b on any axis &mdash; pricing, features, maturity, ecosystem. The agent was debugging in a tight loop, the loop hit a wall that wasn't moving, and the loop pivoted. The human's only input was "here's an e2b key." The architecture just changed.</p>
+
+        <p>A human engineer probably wouldn't have done this. A human would have filed a ticket. Waited a day. Tried a workaround involving a custom base image. Pinged the daytona discord. Spent an afternoon understanding the egress policy well enough to write a real bug report. That's not wrong &mdash; it's how you build a relationship with a vendor you might use for years. But it's also how you lose a week.</p>
+
+        <p>The agent can't build that relationship. It has no politics, no sunk cost, no next-time-will-be-better. It does have, on the other hand, a nearly free cost to rewriting integrations. Swapping an environment plugin is twenty minutes of edits for us. So when the next tool is twenty minutes away, switching is cheaper than understanding.</p>
+
+        <p>The usual engineering virtue is: <em>understand the root cause before you move on</em>. Don't leave mystery behind you. We violated that. The daytona failure is still a mystery. We have a plausible story (whitelist egress, SDK field ignored on free tier) but we never confirmed it, never filed the ticket, never heard back. The story lives in this blog post, not a postmortem.</p>
+
+        <p>And it didn't matter. Canary runs on e2b now. The evals complete. The laptop fan is quiet.</p>
+
+        <div class="section-break"></div>
+
+        <h2>The shape of agent-driven infra</h2>
+
+        <p>If you're building with agents in the loop, this pattern will come up more. Agents don't value principled decisions the way humans do, because for them the decisions aren't expensive. A migration that would cost a team a sprint costs an agent a few tool calls. When the cost of switching collapses, the optimal strategy shifts toward trying things.</p>
+
+        <p>There's a failure mode here. An agent that bails on every hard problem never learns the platform deeply, never contributes fixes back upstream, never becomes the senior engineer who knows where the bodies are. We're not claiming this is how all infra decisions should get made. Some things you have to understand.</p>
+
+        <p>But for the vast middle of "pick a tool that solves a problem," the old instinct &mdash; evaluate three options, write up tradeoffs, commit &mdash; is a ceremony shaped by human costs. When the costs change, the ceremony is optional. Our daytona-to-e2b migration was the least-principled infra decision we've ever made. It also took an afternoon, and it shipped.</p>
+
+        <p>We'll take that trade.</p>
+
+        <div class="section-break"></div>
+
+        <p class="dim">&mdash; canary dev team</p>
+
+        <div class="section-break"></div>
+
+        <a href="/" class="back-link">&larr; Back to noninteractive</a>
+
+      </div>
+    </div>
+  </article>
+
+  <footer>
+    <div class="container">
+      <div class="footer-content">
+        <p>&copy; <a href="https://2027.dev">2027.dev</a> &mdash; San Francisco, CA</p>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
