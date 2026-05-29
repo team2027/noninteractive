@@ -1,0 +1,29 @@
+packages/@sanity/cli/src/commands/init.ts
+  s_75211680f9e0f6::t_24b56dca425b2f 113
+  s_75211680f9e0f6::t_481745a66ee08b 107
+  s_75211680f9e0f6::t_216b4f8f4b8b65 13-21
+  s_75211680f9e0f6::t_d2e613845aab7a 175
+  s_75211680f9e0f6::t_6699d5e13ec106 153
+  s_75211680f9e0f6::t_387bc87b34b8ad 64
+packages/@sanity/cli/src/commands/__tests__/login.test.ts
+  s_75211680f9e0f6::t_a0201fc63e6f8e 1324,1347
+packages/@sanity/cli/src/commands/login.ts
+  s_75211680f9e0f6::t_1c9c3ae4ac22fd 86-91,101,104
+  s_75211680f9e0f6::t_0d869cadee36f5 72-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "34322c9218da09d30b9c35c38b837a3e9f052366",
+  "prompts": {},
+  "sessions": {
+    "s_75211680f9e0f6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c72d6dc-979b-4316-9001-e1f54e884a07",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Aleksey Bykhun <theisease@gmail.com>"
+    }
+  }
+}
