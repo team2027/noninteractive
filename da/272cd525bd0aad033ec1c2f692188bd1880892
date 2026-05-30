@@ -1,0 +1,23 @@
+packages/@sanity/cli/src/commands/tokens/add.ts
+  s_75211680f9e0f6::t_e2bb6b643de7ca 102-104
+packages/@sanity/cli/src/commands/init.ts
+  s_75211680f9e0f6::t_26472a810b6497 46-50
+packages/@sanity/cli/src/commands/tokens/__tests__/add.test.ts
+  s_75211680f9e0f6::t_a89ae99c8ff02e 96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "da272cd525bd0aad033ec1c2f692188bd1880892",
+  "prompts": {},
+  "sessions": {
+    "s_75211680f9e0f6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c72d6dc-979b-4316-9001-e1f54e884a07",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Aleksey Bykhun <theisease@gmail.com>"
+    }
+  }
+}
