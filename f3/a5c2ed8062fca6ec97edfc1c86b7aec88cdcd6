@@ -1,0 +1,23 @@
+packages/@sanity/cli/src/actions/init/initAction.ts
+  s_75211680f9e0f6::t_9a81a47c8c3642 5-10
+  s_75211680f9e0f6::t_fd737d6258a03c 410-412,418
+packages/@sanity/cli/src/actions/auth/login/login.ts
+  s_75211680f9e0f6::t_fea725010489b0 111-114
+  s_75211680f9e0f6::t_943e410ac3e874 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f3a5c2ed8062fca6ec97edfc1c86b7aec88cdcd6",
+  "prompts": {},
+  "sessions": {
+    "s_75211680f9e0f6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c72d6dc-979b-4316-9001-e1f54e884a07",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Aleksey Bykhun <theisease@gmail.com>"
+    }
+  }
+}
