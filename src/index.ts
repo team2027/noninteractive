@@ -1,9 +1,10 @@
 #!/usr/bin/env bun
 
-import { execSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { type DaemonResponse, sendMessage } from "./client";
 import { ensureSessionsDir, sessionOutputFile, socketPath } from "./paths";
+import { isAuthUrl } from "./urls";
 
 const HELP = `noninteractive — run interactive CLI commands non-interactively.
 
@@ -23,7 +24,9 @@ flags:
   --no-wait          fire-and-forget mode for send (don't wait for output)
   --wait, -w         block until new output appears (for read)
   --timeout <ms>     max wait time in ms (default: 30000)
-  --no-open          don't auto-open URLs in browser (still shown in output)
+
+detected URLs are printed (not auto-opened) — login/OAuth URLs are tagged
+"[login url: …]". open the login URL in a browser to continue the auth flow.
 
 the session name is auto-derived from the tool (e.g. "workos" → session "workos").
 use --name to override, --cwd to set the working directory.
@@ -143,24 +146,24 @@ function stripAnsi(s: string): string {
 
 const seenUrls = new Set<string>();
 
-function openUrl(url: string) {
-	try {
-		const cmd = process.platform === "darwin" ? "open" : "xdg-open";
-		execSync(`${cmd} ${JSON.stringify(url)}`, { stdio: "ignore" });
-	} catch {}
-}
-
-function handleUrls(res: DaemonResponse, noOpen: boolean) {
+// URLs are surfaced, never auto-opened: auto-opening guessed wrong (a brittle
+// regex popped incidental tabs for upgrade notices / doc links during logins).
+// Print each new URL, flag the auth-looking ones, and let the agent open the
+// right one in a browser.
+function handleUrls(res: DaemonResponse) {
 	if (!res.urls || res.urls.length === 0) return;
-	for (const url of res.urls) {
-		if (seenUrls.has(url)) continue;
-		seenUrls.add(url);
-		if (!noOpen) {
-			openUrl(url);
-			process.stderr.write(`[opened: ${url}]\n`);
-		} else {
-			process.stderr.write(`[url: ${url}]\n`);
-		}
+	const fresh = res.urls.filter((u) => !seenUrls.has(u));
+	for (const u of fresh) seenUrls.add(u);
+	if (fresh.length === 0) return;
+
+	for (const url of fresh) {
+		const label = isAuthUrl(url) ? "login url" : "url";
+		process.stderr.write(`[${label}: ${url}]\n`);
+	}
+	if (fresh.some(isAuthUrl)) {
+		process.stderr.write(
+			`[open the login url above in a browser to continue the auth flow]\n`,
+		);
 	}
 }
 
@@ -211,12 +214,7 @@ function deriveSessionName(cmd: string, args: string[]): string {
 		.replace(/[^a-zA-Z0-9_-]/g, "");
 }
 
-async function start(
-	cmdArgs: string[],
-	noOpen = false,
-	sessionName?: string,
-	cwd?: string,
-) {
+async function start(cmdArgs: string[], sessionName?: string, cwd?: string) {
 	const executable = cmdArgs[0];
 	const args = cmdArgs.slice(1);
 	const baseName = sessionName || deriveSessionName(executable, args);
@@ -307,7 +305,7 @@ async function start(
 		await new Promise((r) => setTimeout(r, 200));
 		try {
 			const res = await sendMessage(sock, { action: "read" });
-			handleUrls(res, noOpen);
+			handleUrls(res);
 			const clean = stripSpinners(stripAnsi(res.output ?? ""));
 			if (clean.length > 10) {
 				process.stdout.write(stripAnsi(res.output));
@@ -373,12 +371,7 @@ async function start(
 	);
 }
 
-async function read(
-	name: string,
-	wait: boolean,
-	timeout: number,
-	noOpen = false,
-) {
+async function read(name: string, wait: boolean, timeout: number) {
 	const sock = socketPath(name);
 	const msg: Record<string, unknown> = { action: "read" };
 	if (wait) {
@@ -389,7 +382,7 @@ async function read(
 	try {
 		const res = await sendMessage(sock, msg, clientTimeout);
 		if (res.output !== undefined) process.stdout.write(stripAnsi(res.output));
-		handleUrls(res, noOpen);
+		handleUrls(res);
 		if (res.exited) {
 			console.log(`\n[exited ${res.exitCode}]`);
 			console.log(
@@ -415,7 +408,6 @@ async function send(
 	text: string,
 	wait: boolean,
 	timeout: number,
-	noOpen = false,
 ) {
 	// empty string "" is a shorthand for pressing Enter
 	if (text === "") text = "\r";
@@ -455,7 +447,7 @@ async function send(
 				timeout + 5000,
 			);
 			if (res.output !== undefined) process.stdout.write(stripAnsi(res.output));
-			handleUrls(res, noOpen);
+			handleUrls(res);
 			if (res.exited) {
 				console.log(`\n[exited ${res.exitCode}]`);
 				console.log(
@@ -526,7 +518,6 @@ async function main() {
 	switch (cmd) {
 		case "start": {
 			const startArgs = args.slice(1);
-			const noOpen = startArgs.includes("--no-open");
 			// parse --name and --cwd flags
 			let sessionName: string | undefined;
 			let cwd: string | undefined;
@@ -545,7 +536,7 @@ async function main() {
 					`hint: the -- separator is not needed. just put the command after the flags.`,
 				);
 			}
-			const filtered = startArgs.filter((a) => a !== "--no-open" && a !== "--");
+			const filtered = startArgs.filter((a) => a !== "--");
 			if (filtered.includes("--help") || filtered.includes("-h")) {
 				console.log(`usage: noninteractive start [--name <session>] [--cwd <dir>] <cmd> [args...]
 
@@ -565,11 +556,10 @@ flags:
 				);
 				process.exit(1);
 			}
-			return start(filtered, noOpen, sessionName, cwd);
+			return start(filtered, sessionName, cwd);
 		}
 		case "read": {
 			const readArgs = args.slice(1);
-			const noOpen = readArgs.includes("--no-open");
 			const name = readArgs.find((a) => !a.startsWith("-"));
 			if (!name) {
 				console.error(
@@ -581,12 +571,11 @@ flags:
 			const timeoutIdx = readArgs.indexOf("--timeout");
 			const timeout =
 				timeoutIdx !== -1 ? Number(readArgs[timeoutIdx + 1]) : 30000;
-			return read(name, wait, timeout, noOpen);
+			return read(name, wait, timeout);
 		}
 		case "sendread":
 		case "send": {
 			const sendArgs = args.slice(1);
-			const noOpen = sendArgs.includes("--no-open");
 			const positional = sendArgs.filter((a) => !a.startsWith("-"));
 			const name = positional[0];
 			const text = positional[1];
@@ -607,7 +596,7 @@ flags:
 			const timeoutIdx = sendArgs.indexOf("--timeout");
 			const timeout =
 				timeoutIdx !== -1 ? Number(sendArgs[timeoutIdx + 1]) : 30000;
-			return send(name, text, wait, timeout, noOpen);
+			return send(name, text, wait, timeout);
 		}
 		case "stop": {
 			const name = args[1];
@@ -676,12 +665,9 @@ flags:
 					`hint: the -- separator is not needed. just put the command after the flags.`,
 				);
 			}
-			const noOpen = mutableArgs.includes("--no-open");
-			const filteredArgs = mutableArgs.filter(
-				(a) => a !== "--no-open" && a !== "--",
-			);
+			const filteredArgs = mutableArgs.filter((a) => a !== "--");
 			console.log(`[installing and running: npx ${filteredArgs.join(" ")}]`);
-			return start(["npx", "--yes", ...filteredArgs], noOpen, sessionName, cwd);
+			return start(["npx", "--yes", ...filteredArgs], sessionName, cwd);
 		}
 	}
 }

@@ -18,6 +18,7 @@ import {
 	sessionUrlsFile,
 	socketPath,
 } from "./paths";
+import { stripTrailingPunctuation, URL_RE } from "./urls";
 
 interface DaemonMessage {
 	action: "read" | "send" | "sendread" | "stop" | "status";
@@ -46,8 +47,6 @@ function getPtyBridge(): string {
 	}
 	return candidates[0];
 }
-
-const URL_RE = /https?:\/\/[^\s<>"')\]]+/g;
 
 function createInterceptorScripts(name: string) {
 	const binDir = sessionBinDir(name);
@@ -107,6 +106,8 @@ export function runDaemon(
 	let processExited = false;
 	let exitCode: number | null = null;
 	let lastReadLength = 0; // tracks what the client has seen
+	// every url surfaced to the client (output scans + browser-open intercepts),
+	// punctuation-trimmed and deduped; the client decides what to do with them
 	const detectedUrls = new Set<string>();
 	const reportedUrls = new Set<string>();
 
@@ -158,9 +159,8 @@ export function runDaemon(
 
 	function scanForUrls(text: string) {
 		const matches = text.match(URL_RE);
-		if (matches) {
-			for (const url of matches) detectedUrls.add(url);
-		}
+		if (!matches) return;
+		for (const raw of matches) detectedUrls.add(stripTrailingPunctuation(raw));
 	}
 
 	function readInterceptedUrls() {
@@ -171,7 +171,7 @@ export function runDaemon(
 			const lines = content.split("\n");
 			for (const line of lines) {
 				const trimmed = line.trim();
-				if (trimmed) detectedUrls.add(trimmed);
+				if (trimmed) detectedUrls.add(stripTrailingPunctuation(trimmed));
 			}
 		} catch {}
 	}

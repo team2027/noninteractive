@@ -36,11 +36,11 @@ bun run build:pty  # cross-compiles Go PTY bridge for all platforms
 
 ## URL interception
 
-OAuth/browser URLs are auto-detected and opened client-side. Three layers:
+OAuth/browser URLs are auto-detected and surfaced to the agent (not auto-opened — see below). Three layers:
 
 1. **Shadow scripts** — `open`/`xdg-open`/`browser-open` wrappers in `~/.noninteractive/sessions/<name>/bin/` intercept browser-open calls and write URLs to a file. Session bin dir prepended to PATH, `BROWSER` env points to `browser-open` script.
-2. **Output scanning** — daemon scans stdout/stderr for `https?://` URLs. Merges with intercepted URLs. All URLs returned in `urls` array on every response.
-3. **Client-side opening** — client auto-opens new URLs via platform `open`/`xdg-open`. `--no-open` disables auto-opening.
+2. **Output scanning** — daemon scans stdout/stderr for `https?://` URLs, trims trailing sentence punctuation (`.,;:!?'"`) off each match, merges with intercepted URLs. All URLs returned (deduped) in `urls` array. URL/punctuation helpers live in `src/urls.ts`.
+3. **Client-side surfacing** — client prints each new URL to stderr instead of opening it. Auth-looking URLs (`/oauth|authorize|device|login|callback/i`) are tagged `[login url: …]` with a follow-up "open … in a browser to continue" hint, so the driving agent opens the right one itself. No auto-open: a regex guessing which URL to open popped incidental tabs (upgrade notices, doc links) during logins (issue #10).
 
 Session dirs (bin/, urls file) cleaned up on stop/exit.
 
