@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { isAuthUrl, stripTrailingPunctuation } from "./urls";
+import { extractUrls, isAuthUrl, stripTrailingPunctuation } from "./urls";
 
 test("strips a trailing sentence period", () => {
 	expect(stripTrailingPunctuation("https://x.com/releases.")).toBe(
@@ -36,4 +36,28 @@ test("does not flag incidental non-auth urls", () => {
 		false,
 	);
 	expect(isAuthUrl("https://docs.example.com/getting-started")).toBe(false);
+});
+
+test("strips a trailing ANSI reset off a colored url", () => {
+	expect(extractUrls("\x1b[34mhttps://x.com/releases\x1b[0m")).toEqual([
+		"https://x.com/releases",
+	]);
+});
+
+test("strips ANSI reset and trailing period together", () => {
+	expect(extractUrls("see \x1b[34mhttps://x.com/releases.\x1b[0m now")).toEqual([
+		"https://x.com/releases",
+	]);
+});
+
+test("rejoins a url broken by a mid-string color reset", () => {
+	expect(extractUrls("https://x.com/\x1b[0mreleases")).toEqual([
+		"https://x.com/releases",
+	]);
+});
+
+test("extracts multiple urls and strips punctuation", () => {
+	expect(
+		extractUrls("a https://x.com/a, then https://x.com/login/device."),
+	).toEqual(["https://x.com/a", "https://x.com/login/device"]);
 });

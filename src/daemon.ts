@@ -18,7 +18,7 @@ import {
 	sessionUrlsFile,
 	socketPath,
 } from "./paths";
-import { stripTrailingPunctuation, URL_RE } from "./urls";
+import { extractUrls, stripTrailingPunctuation } from "./urls";
 
 interface DaemonMessage {
 	action: "read" | "send" | "sendread" | "stop" | "status";
@@ -158,9 +158,7 @@ export function runDaemon(
 	const { stdout, stderr, stdin } = proc;
 
 	function scanForUrls(text: string) {
-		const matches = text.match(URL_RE);
-		if (!matches) return;
-		for (const raw of matches) detectedUrls.add(stripTrailingPunctuation(raw));
+		for (const url of extractUrls(text)) detectedUrls.add(url);
 	}
 
 	function readInterceptedUrls() {
