@@ -7,7 +7,7 @@ const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g;
 
 // urls that look like an interactive auth flow — used to *hint* which printed
 // url an agent should open, never to gate what gets surfaced
-const AUTH_URL_RE = /oauth|authorize|device|login|callback/i;
+const AUTH_URL_RE = /oauth|authorize|device|activate|login|callback/i;
 
 // the url char class doesn't exclude sentence punctuation, so a match can swallow
 // a trailing "." etc — e.g. "…/releases." → a 404. trim it off the end.

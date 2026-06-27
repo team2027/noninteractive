@@ -29,6 +29,7 @@ test("flags auth-flow urls", () => {
 	expect(isAuthUrl("https://github.com/login/device")).toBe(true);
 	expect(isAuthUrl("https://accounts.google.com/o/oauth2/auth")).toBe(true);
 	expect(isAuthUrl("https://example.com/callback?code=1")).toBe(true);
+	expect(isAuthUrl("https://example.com/activate?user_code=ABCD")).toBe(true);
 });
 
 test("does not flag incidental non-auth urls", () => {
@@ -45,9 +46,9 @@ test("strips a trailing ANSI reset off a colored url", () => {
 });
 
 test("strips ANSI reset and trailing period together", () => {
-	expect(extractUrls("see \x1b[34mhttps://x.com/releases.\x1b[0m now")).toEqual([
-		"https://x.com/releases",
-	]);
+	expect(extractUrls("see \x1b[34mhttps://x.com/releases.\x1b[0m now")).toEqual(
+		["https://x.com/releases"],
+	);
 });
 
 test("rejoins a url broken by a mid-string color reset", () => {
