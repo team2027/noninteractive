@@ -15,16 +15,19 @@ src/index.ts
   s_3ad820fcbbea42::t_44572bdf68bfb1 510
   s_3ad820fcbbea42::t_8e5265897859ff 611-612
   s_3ad820fcbbea42::t_be3bbc9372c9b3 659,663
+  s_3ad820fcbbea42::t_55df5fde75698b 259-261
 src/client.ts
   s_3ad820fcbbea42::t_e5fdd93104fdd2 13
 package.json
   s_3ad820fcbbea42::t_3214b4687cf8e9 3
 CLAUDE.md
   s_3ad820fcbbea42::t_933e91a8aee072 39
+  s_3ad820fcbbea42::t_9c7dd8ddc77760 42-43
 src/daemon.ts
   s_3ad820fcbbea42::t_5d41d168cb230b 113-118
   s_3ad820fcbbea42::t_2698d47b1d550a 181
   s_3ad820fcbbea42::t_acb3dfc10d7c0a 255,264
+  s_3ad820fcbbea42::t_fb78d3df533bdb 182-183
 src/urls.test.ts
   s_3ad820fcbbea42::t_8e08d4e592e688 116-138
   s_3ad820fcbbea42::t_40169b8d321a19 77-89
@@ -38,6 +41,7 @@ src/urls.ts
   s_3ad820fcbbea42::t_da3c17879884ee 66-70
   s_3ad820fcbbea42::t_b8d953081c7778 51-56,71-77
   s_9d6b4043259793::t_317c20c5c82efb 22
+  s_3ad820fcbbea42::t_462a374425abbd 9-12
 ---
 {
   "schema_version": "authorship/3.0.0",
