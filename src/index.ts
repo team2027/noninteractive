@@ -148,6 +148,10 @@ function stripAnsi(s: string): string {
 
 const seenUrls = new Set<string>();
 let openedAuthUrl = false;
+// how much of the output buffer we've already scanned for a self-open
+// announcement. only advances on url-bearing calls, so an announcement that
+// arrives in an intervening no-url read is still paired with the next url.
+let selfOpenScanLen = 0;
 
 function openUrl(url: string): boolean {
 	try {
@@ -159,34 +163,38 @@ function openUrl(url: string): boolean {
 	}
 }
 
-// Surface every detected URL, but auto-open ONLY the first high-confidence auth
-// URL the human needs (device/oauth/activate/callback…) — never docs, signup,
-// marketing, or release links a CLI also prints. At most one tab per process so
-// login flows don't scatter (issue #10). The daemon reports each URL once, so a
-// URL is never re-opened across send/read calls. --no-open suppresses opening.
+// surface every detected url, but auto-open at most one browser tab per process
+// so login flows don't scatter (issue #10). the daemon reports each url once, so
+// a url is never re-opened across send/read calls. --no-open suppresses opening.
 //
-// Which auth URL do WE open? The shim tells us deterministically:
-//   - INTERCEPTED (in res.intercepted): the CLI tried to open it via PATH
-//     `open`/$BROWSER, which we captured and SUPPRESSED — so we must open it
-//     (auth0, daytona, gh, vercel).
-//   - stdout-only: the CLI either didn't try to open (we should open) OR
-//     self-opened via native macOS APIs the shim can't catch (railway,
-//     supabase) — in which case a real window already appeared and opening again
-//     would duplicate the tab. We detect the latter by the CLI announcing
-//     "opening/launching … browser" and skip our open then.
+// which url do we open? the shim tells us deterministically:
+//   - intercepted (in res.intercepted): the cli tried to open it via PATH
+//     `open`/$BROWSER, which we captured and SUPPRESSED — so we MUST open it
+//     ourselves regardless of how its url looks (auth0, daytona, gh, vercel).
+//   - stdout-only: open only the first high-confidence auth url
+//     (device/oauth/authorize/activate/callback) — never docs/signup/release
+//     links — and only if the cli didn't self-open via native macOS apis the
+//     shim can't catch (railway, supabase announce "opening … browser").
 function handleUrls(res: DaemonResponse, noOpen: boolean) {
 	if (!res.urls || res.urls.length === 0) return;
 	const fresh = res.urls.filter((u) => !seenUrls.has(u));
 	for (const u of fresh) seenUrls.add(u);
 	if (fresh.length === 0) return;
 
-	const selfOpens = announcesSelfOpen(res.output ?? "");
+	// scan only output since the last url-bearing call, so a stale self-open
+	// announcement from an earlier step can't suppress opening a later url.
+	const fullOutput = res.output ?? "";
+	const selfOpens = announcesSelfOpen(fullOutput.slice(selfOpenScanLen));
+	selfOpenScanLen = fullOutput.length;
 
 	let opened: string | undefined;
 	if (!noOpen && !openedAuthUrl) {
 		const intercepted = new Set(res.intercepted ?? []);
+		// always open an intercepted url (its native open was suppressed); for
+		// stdout-only urls, open only a high-confidence auth url the cli isn't
+		// already opening itself.
 		const target = fresh.find(
-			(u) => isAutoOpenUrl(u) && (intercepted.has(u) || !selfOpens),
+			(u) => intercepted.has(u) || (isAutoOpenUrl(u) && !selfOpens),
 		);
 		if (target && openUrl(target)) {
 			openedAuthUrl = true;
