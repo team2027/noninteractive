@@ -18,7 +18,7 @@ import {
 	sessionUrlsFile,
 	socketPath,
 } from "./paths";
-import { extractUrls, stripTrailingPunctuation } from "./urls";
+import { extractUrls } from "./urls";
 
 interface DaemonMessage {
 	action: "read" | "send" | "sendread" | "stop" | "status";
@@ -168,8 +168,11 @@ export function runDaemon(
 			const content = readFileSync(urlsFile, "utf-8");
 			const lines = content.split("\n");
 			for (const line of lines) {
-				const trimmed = line.trim();
-				if (trimmed) detectedUrls.add(stripTrailingPunctuation(trimmed));
+				// intercepted urls are the exact argv the child asked to open, not
+			// prose — keep them verbatim (a trailing "." etc may be a real query
+			// /state value). punctuation trimming only applies to scanned output.
+			const trimmed = line.trim();
+				if (trimmed) detectedUrls.add(trimmed);
 			}
 		} catch {}
 	}
