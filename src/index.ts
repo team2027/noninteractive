@@ -536,7 +536,11 @@ async function main() {
 					`hint: the -- separator is not needed. just put the command after the flags.`,
 				);
 			}
-			const filtered = startArgs.filter((a) => a !== "--");
+			// --no-open is gone (nothing auto-opens), but drop it from legacy
+			// invocations so it isn't mistaken for the command to spawn.
+			const filtered = startArgs.filter(
+				(a) => a !== "--" && a !== "--no-open",
+			);
 			if (filtered.includes("--help") || filtered.includes("-h")) {
 				console.log(`usage: noninteractive start [--name <session>] [--cwd <dir>] <cmd> [args...]
 
@@ -665,7 +669,10 @@ flags:
 					`hint: the -- separator is not needed. just put the command after the flags.`,
 				);
 			}
-			const filteredArgs = mutableArgs.filter((a) => a !== "--");
+			// drop legacy --no-open so it isn't forwarded to npx as an arg.
+			const filteredArgs = mutableArgs.filter(
+				(a) => a !== "--" && a !== "--no-open",
+			);
 			console.log(`[installing and running: npx ${filteredArgs.join(" ")}]`);
 			return start(["npx", "--yes", ...filteredArgs], sessionName, cwd);
 		}
