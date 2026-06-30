@@ -1,0 +1,19 @@
+CLAUDE.md
+  s_c1e020f5bca10e::t_1c3c7ad4ffdcb1 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "fc3098103dce72b4e620535ee2320a98a9b56b00",
+  "prompts": {},
+  "sessions": {
+    "s_c1e020f5bca10e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a3c5bd6a-bc5b-49c7-bfd0-4a11a4a0ae79",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Aleksey Bykhun <theisease@gmail.com>"
+    }
+  }
+}
