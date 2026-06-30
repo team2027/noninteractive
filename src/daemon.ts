@@ -116,6 +116,11 @@ export function runDaemon(
 	// (railway/supabase) bypasses the shim and never lands here, so the client
 	// knows not to double-open it.
 	const interceptedUrls = new Set<string>();
+	// intercepted urls already flagged to the client. tracked separately from
+	// reportedUrls because a url can be surfaced from stdout (reported) before
+	// the shim's file write lands — we must still send the intercept signal
+	// afterwards, even though the url itself is no longer "new".
+	const reportedIntercepted = new Set<string>();
 
 	type Waiter = {
 		resolve: (output: string) => void;
@@ -252,7 +257,12 @@ export function runDaemon(
 			(u) => !reportedUrls.has(u),
 		);
 		for (const u of newUrls) reportedUrls.add(u);
-		const intercepted = newUrls.filter((u) => interceptedUrls.has(u));
+		// report each intercepted url once, independently of newUrls — the
+		// intercept signal can arrive after the url was already surfaced.
+		const intercepted = Array.from(interceptedUrls).filter(
+			(u) => !reportedIntercepted.has(u),
+		);
+		for (const u of intercepted) reportedIntercepted.add(u);
 		socket.end(
 			JSON.stringify({
 				ok: true,

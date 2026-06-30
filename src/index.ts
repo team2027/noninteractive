@@ -4,7 +4,7 @@ import { execSync, spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { type DaemonResponse, sendMessage } from "./client";
 import { ensureSessionsDir, sessionOutputFile, socketPath } from "./paths";
-import { announcesSelfOpen, isAuthUrl, isAutoOpenUrl } from "./urls";
+import { announcesSelfOpen, isAuthUrl, pickAutoOpenUrl } from "./urls";
 
 const HELP = `noninteractive — run interactive CLI commands non-interactively.
 
@@ -176,12 +176,16 @@ function openUrl(url: string): boolean {
 //     links — and only if the cli didn't self-open via native macOS apis the
 //     shim can't catch (railway, supabase announce "opening … browser").
 function handleUrls(res: DaemonResponse, noOpen: boolean) {
-	if (!res.urls || res.urls.length === 0) return;
-	const fresh = res.urls.filter((u) => !seenUrls.has(u));
+	const interceptedList = res.intercepted ?? [];
+	// the intercept signal can arrive in a response with no new url (the shim's
+	// file write landed after the url was already surfaced), so don't bail on
+	// empty urls alone — only when there's nothing at all to act on.
+	if ((!res.urls || res.urls.length === 0) && interceptedList.length === 0)
+		return;
+	const fresh = (res.urls ?? []).filter((u) => !seenUrls.has(u));
 	for (const u of fresh) seenUrls.add(u);
-	if (fresh.length === 0) return;
 
-	// scan only output since the last url-bearing call, so a stale self-open
+	// scan only output since the last call we acted on, so a stale self-open
 	// announcement from an earlier step can't suppress opening a later url.
 	const fullOutput = res.output ?? "";
 	const selfOpens = announcesSelfOpen(fullOutput.slice(selfOpenScanLen));
@@ -189,13 +193,12 @@ function handleUrls(res: DaemonResponse, noOpen: boolean) {
 
 	let opened: string | undefined;
 	if (!noOpen && !openedAuthUrl) {
-		const intercepted = new Set(res.intercepted ?? []);
-		// always open an intercepted url (its native open was suppressed); for
-		// stdout-only urls, open only a high-confidence auth url the cli isn't
-		// already opening itself.
-		const target = fresh.find(
-			(u) => intercepted.has(u) || (isAutoOpenUrl(u) && !selfOpens),
-		);
+		// prefer an intercepted url — the cli's own browser-open was suppressed,
+		// so we must open it, even if it was already surfaced from stdout earlier.
+		// otherwise open the first high-confidence stdout-only auth url, but only
+		// when the cli isn't opening its own browser tab.
+		const target =
+			interceptedList[0] ?? (selfOpens ? undefined : pickAutoOpenUrl(fresh));
 		if (target && openUrl(target)) {
 			openedAuthUrl = true;
 			opened = target;
