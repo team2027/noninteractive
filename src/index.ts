@@ -214,6 +214,13 @@ function deriveSessionName(cmd: string, args: string[]): string {
 		.replace(/[^a-zA-Z0-9_-]/g, "");
 }
 
+// drop the `--` separator and the removed `--no-open` flag from a command's
+// args. --no-open no longer does anything (nothing auto-opens), but legacy
+// invocations still pass it, so strip it rather than spawn it as the command.
+function stripLegacyFlags(args: string[]): string[] {
+	return args.filter((a) => a !== "--" && a !== "--no-open");
+}
+
 async function start(cmdArgs: string[], sessionName?: string, cwd?: string) {
 	const executable = cmdArgs[0];
 	const args = cmdArgs.slice(1);
@@ -536,11 +543,7 @@ async function main() {
 					`hint: the -- separator is not needed. just put the command after the flags.`,
 				);
 			}
-			// --no-open is gone (nothing auto-opens), but drop it from legacy
-			// invocations so it isn't mistaken for the command to spawn.
-			const filtered = startArgs.filter(
-				(a) => a !== "--" && a !== "--no-open",
-			);
+			const filtered = stripLegacyFlags(startArgs);
 			if (filtered.includes("--help") || filtered.includes("-h")) {
 				console.log(`usage: noninteractive start [--name <session>] [--cwd <dir>] <cmd> [args...]
 
@@ -669,10 +672,7 @@ flags:
 					`hint: the -- separator is not needed. just put the command after the flags.`,
 				);
 			}
-			// drop legacy --no-open so it isn't forwarded to npx as an arg.
-			const filteredArgs = mutableArgs.filter(
-				(a) => a !== "--" && a !== "--no-open",
-			);
+			const filteredArgs = stripLegacyFlags(mutableArgs);
 			console.log(`[installing and running: npx ${filteredArgs.join(" ")}]`);
 			return start(["npx", "--yes", ...filteredArgs], sessionName, cwd);
 		}
