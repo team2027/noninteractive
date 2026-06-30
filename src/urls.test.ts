@@ -32,11 +32,31 @@ test("flags auth-flow urls", () => {
 	expect(isAuthUrl("https://example.com/activate?user_code=ABCD")).toBe(true);
 });
 
+test("flags bare /auth, signin and sso endpoints", () => {
+	expect(isAuthUrl("https://id.example.com/auth?response_type=code")).toBe(true);
+	expect(isAuthUrl("https://id.example.com/auth")).toBe(true);
+	expect(isAuthUrl("https://example.com/signin")).toBe(true);
+	expect(isAuthUrl("https://example.com/sign-in")).toBe(true);
+	expect(isAuthUrl("https://example.com/sso/start")).toBe(true);
+});
+
 test("does not flag incidental non-auth urls", () => {
 	expect(isAuthUrl("https://github.com/daytonaio/daytona/releases")).toBe(
 		false,
 	);
 	expect(isAuthUrl("https://docs.example.com/getting-started")).toBe(false);
+	expect(isAuthUrl("https://example.com/authors/jane")).toBe(false);
+});
+
+test("strips an osc-8 hyperlink wrapper instead of swallowing escape bytes", () => {
+	// osc-8 hyperlink whose visible text is the url itself → url survives clean
+	expect(
+		extractUrls(
+			"\x1b]8;;https://x.com/login/device\x1b\\https://x.com/login/device\x1b]8;;\x1b\\",
+		),
+	).toEqual(["https://x.com/login/device"]);
+	// BEL-terminated osc form is stripped too (no garbled escape bytes remain)
+	expect(extractUrls("\x1b]8;;https://x.com/a\x07link\x1b]8;;\x07")).toEqual([]);
 });
 
 test("strips a trailing ANSI reset off a colored url", () => {

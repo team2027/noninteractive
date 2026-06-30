@@ -146,9 +146,9 @@ function stripAnsi(s: string): string {
 
 const seenUrls = new Set<string>();
 
-// URLs are surfaced, never auto-opened: auto-opening guessed wrong (a brittle
+// urls are surfaced, never auto-opened: auto-opening guessed wrong (a brittle
 // regex popped incidental tabs for upgrade notices / doc links during logins).
-// Print each new URL, flag the auth-looking ones, and let the agent open the
+// print each new url, flag the auth-looking ones, and let the agent open the
 // right one in a browser.
 function handleUrls(res: DaemonResponse) {
 	if (!res.urls || res.urls.length === 0) return;
