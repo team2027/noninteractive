@@ -10,6 +10,7 @@ export interface DaemonResponse {
 	pid?: number;
 	error?: string;
 	urls?: string[];
+	intercepted?: string[];
 }
 
 export function sendMessage(

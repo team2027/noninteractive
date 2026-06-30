@@ -4,6 +4,7 @@ import { execSync, spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { type DaemonResponse, sendMessage } from "./client";
 import { ensureSessionsDir, sessionOutputFile, socketPath } from "./paths";
+import { announcesSelfOpen, isAuthUrl, pickAutoOpenUrl } from "./urls";
 
 const HELP = `noninteractive — run interactive CLI commands non-interactively.
 
@@ -23,7 +24,11 @@ flags:
   --no-wait          fire-and-forget mode for send (don't wait for output)
   --wait, -w         block until new output appears (for read)
   --timeout <ms>     max wait time in ms (default: 30000)
-  --no-open          don't auto-open URLs in browser (still shown in output)
+  --no-open          don't auto-open any URL (still surfaced in output)
+
+all detected URLs are surfaced; the first high-confidence auth URL
+(device/oauth/authorize/activate/callback) is auto-opened in a browser so the
+human can complete login. docs/signup/marketing/release links are never opened.
 
 the session name is auto-derived from the tool (e.g. "workos" → session "workos").
 use --name to override, --cwd to set the working directory.
@@ -142,25 +147,76 @@ function stripAnsi(s: string): string {
 }
 
 const seenUrls = new Set<string>();
+let openedAuthUrl = false;
+// how much of the output buffer we've already scanned for a self-open
+// announcement. only advances on url-bearing calls, so an announcement that
+// arrives in an intervening no-url read is still paired with the next url.
+let selfOpenScanLen = 0;
 
-function openUrl(url: string) {
+function openUrl(url: string): boolean {
 	try {
 		const cmd = process.platform === "darwin" ? "open" : "xdg-open";
 		execSync(`${cmd} ${JSON.stringify(url)}`, { stdio: "ignore" });
-	} catch {}
+		return true;
+	} catch {
+		return false;
+	}
 }
 
+// surface every detected url, but auto-open at most one browser tab per process
+// so login flows don't scatter (issue #10). the daemon reports each url once, so
+// a url is never re-opened across send/read calls. --no-open suppresses opening.
+//
+// which url do we open? the shim tells us deterministically:
+//   - intercepted (in res.intercepted): the cli tried to open it via PATH
+//     `open`/$BROWSER, which we captured and SUPPRESSED — so we MUST open it
+//     ourselves regardless of how its url looks (auth0, daytona, gh, vercel).
+//   - stdout-only: open only the first high-confidence auth url
+//     (device/oauth/authorize/activate/callback) — never docs/signup/release
+//     links — and only if the cli didn't self-open via native macOS apis the
+//     shim can't catch (railway, supabase announce "opening … browser").
 function handleUrls(res: DaemonResponse, noOpen: boolean) {
-	if (!res.urls || res.urls.length === 0) return;
-	for (const url of res.urls) {
-		if (seenUrls.has(url)) continue;
-		seenUrls.add(url);
-		if (!noOpen) {
-			openUrl(url);
-			process.stderr.write(`[opened: ${url}]\n`);
-		} else {
-			process.stderr.write(`[url: ${url}]\n`);
+	const interceptedList = res.intercepted ?? [];
+	// the intercept signal can arrive in a response with no new url (the shim's
+	// file write landed after the url was already surfaced), so don't bail on
+	// empty urls alone — only when there's nothing at all to act on.
+	if ((!res.urls || res.urls.length === 0) && interceptedList.length === 0)
+		return;
+	const fresh = (res.urls ?? []).filter((u) => !seenUrls.has(u));
+	for (const u of fresh) seenUrls.add(u);
+
+	// scan only output since the last call we acted on, so a stale self-open
+	// announcement from an earlier step can't suppress opening a later url.
+	const fullOutput = res.output ?? "";
+	const selfOpens = announcesSelfOpen(fullOutput.slice(selfOpenScanLen));
+	selfOpenScanLen = fullOutput.length;
+
+	let opened: string | undefined;
+	if (!noOpen && !openedAuthUrl) {
+		// prefer an intercepted url — the cli's own browser-open was suppressed,
+		// so we must open it, even if it was already surfaced from stdout earlier.
+		// otherwise open the first high-confidence stdout-only auth url, but only
+		// when the cli isn't opening its own browser tab.
+		const target =
+			interceptedList[0] ?? (selfOpens ? undefined : pickAutoOpenUrl(fresh));
+		if (target && openUrl(target)) {
+			openedAuthUrl = true;
+			opened = target;
+			process.stderr.write(`[opened login url: ${target}]\n`);
 		}
+	}
+
+	for (const url of fresh) {
+		if (url === opened) continue;
+		const label = isAuthUrl(url) ? "login url" : "url";
+		process.stderr.write(`[${label}: ${url}]\n`);
+	}
+	// only nudge the agent to open it manually when nobody opened it — not when
+	// the CLI is opening its own browser tab.
+	if (!opened && !selfOpens && fresh.some(isAuthUrl)) {
+		process.stderr.write(
+			`[open the login url above in a browser to continue the auth flow]\n`,
+		);
 	}
 }
 
@@ -209,6 +265,13 @@ function deriveSessionName(cmd: string, args: string[]): string {
 	return (stripped || name)
 		.replace(/^@[^/]+\//, "")
 		.replace(/[^a-zA-Z0-9_-]/g, "");
+}
+
+// drop the `--` separator from a command's args, and the `--no-open` flag
+// (consumed by us, not the child) so legacy/explicit invocations don't spawn it
+// as the command. --no-open's effect (suppress auto-open) is read separately.
+function stripLegacyFlags(args: string[]): string[] {
+	return args.filter((a) => a !== "--" && a !== "--no-open");
 }
 
 async function start(
@@ -526,10 +589,10 @@ async function main() {
 	switch (cmd) {
 		case "start": {
 			const startArgs = args.slice(1);
-			const noOpen = startArgs.includes("--no-open");
 			// parse --name and --cwd flags
 			let sessionName: string | undefined;
 			let cwd: string | undefined;
+			const noOpen = startArgs.includes("--no-open");
 			const nameIdx = startArgs.indexOf("--name");
 			if (nameIdx !== -1) {
 				sessionName = startArgs[nameIdx + 1];
@@ -545,7 +608,7 @@ async function main() {
 					`hint: the -- separator is not needed. just put the command after the flags.`,
 				);
 			}
-			const filtered = startArgs.filter((a) => a !== "--no-open" && a !== "--");
+			const filtered = stripLegacyFlags(startArgs);
 			if (filtered.includes("--help") || filtered.includes("-h")) {
 				console.log(`usage: noninteractive start [--name <session>] [--cwd <dir>] <cmd> [args...]
 
@@ -556,7 +619,8 @@ examples:
 
 flags:
   --name <session>   set session name (default: auto-derived from command)
-  --cwd <dir>        set working directory for the command`);
+  --cwd <dir>        set working directory for the command
+  --no-open          don't auto-open any URL (still surfaced in output)`);
 				process.exit(0);
 			}
 			if (filtered.length < 1) {
@@ -569,7 +633,6 @@ flags:
 		}
 		case "read": {
 			const readArgs = args.slice(1);
-			const noOpen = readArgs.includes("--no-open");
 			const name = readArgs.find((a) => !a.startsWith("-"));
 			if (!name) {
 				console.error(
@@ -578,6 +641,7 @@ flags:
 				process.exit(1);
 			}
 			const wait = readArgs.includes("-w") || readArgs.includes("--wait");
+			const noOpen = readArgs.includes("--no-open");
 			const timeoutIdx = readArgs.indexOf("--timeout");
 			const timeout =
 				timeoutIdx !== -1 ? Number(readArgs[timeoutIdx + 1]) : 30000;
@@ -586,7 +650,6 @@ flags:
 		case "sendread":
 		case "send": {
 			const sendArgs = args.slice(1);
-			const noOpen = sendArgs.includes("--no-open");
 			const positional = sendArgs.filter((a) => !a.startsWith("-"));
 			const name = positional[0];
 			const text = positional[1];
@@ -604,6 +667,7 @@ flags:
 				cmd === "sendread" ||
 				sendArgs.includes("-w") ||
 				sendArgs.includes("--wait");
+			const noOpen = sendArgs.includes("--no-open");
 			const timeoutIdx = sendArgs.indexOf("--timeout");
 			const timeout =
 				timeoutIdx !== -1 ? Number(sendArgs[timeoutIdx + 1]) : 30000;
@@ -640,6 +704,7 @@ flags:
 			let sessionName: string | undefined;
 			let cwd: string | undefined;
 			const mutableArgs = [...args];
+			const noOpen = mutableArgs.includes("--no-open");
 			const nameIdx = mutableArgs.indexOf("--name");
 			if (nameIdx !== -1) {
 				sessionName = mutableArgs[nameIdx + 1];
@@ -676,10 +741,7 @@ flags:
 					`hint: the -- separator is not needed. just put the command after the flags.`,
 				);
 			}
-			const noOpen = mutableArgs.includes("--no-open");
-			const filteredArgs = mutableArgs.filter(
-				(a) => a !== "--no-open" && a !== "--",
-			);
+			const filteredArgs = stripLegacyFlags(mutableArgs);
 			console.log(`[installing and running: npx ${filteredArgs.join(" ")}]`);
 			return start(["npx", "--yes", ...filteredArgs], noOpen, sessionName, cwd);
 		}

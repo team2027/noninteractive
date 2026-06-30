@@ -1,6 +1,6 @@
 {
   "name": "noninteractive",
-  "version": "0.3.34",
+  "version": "0.3.36",
   "type": "module",
   "bin": {
     "noninteractive": "./bin/noninteractive.js"

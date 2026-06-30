@@ -18,6 +18,7 @@ import {
 	sessionUrlsFile,
 	socketPath,
 } from "./paths";
+import { extractUrls } from "./urls";
 
 interface DaemonMessage {
 	action: "read" | "send" | "sendread" | "stop" | "status";
@@ -46,8 +47,6 @@ function getPtyBridge(): string {
 	}
 	return candidates[0];
 }
-
-const URL_RE = /https?:\/\/[^\s<>"')\]]+/g;
 
 function createInterceptorScripts(name: string) {
 	const binDir = sessionBinDir(name);
@@ -107,8 +106,21 @@ export function runDaemon(
 	let processExited = false;
 	let exitCode: number | null = null;
 	let lastReadLength = 0; // tracks what the client has seen
+	// every url surfaced to the client (output scans + browser-open intercepts),
+	// punctuation-trimmed and deduped; the client decides what to do with them
 	const detectedUrls = new Set<string>();
 	const reportedUrls = new Set<string>();
+	// urls the shim actually intercepted (the CLI tried to open them via
+	// PATH `open`/`xdg-open`/$BROWSER, which we captured and suppressed). these
+	// are the ones the client MUST open itself — a CLI that self-opens natively
+	// (railway/supabase) bypasses the shim and never lands here, so the client
+	// knows not to double-open it.
+	const interceptedUrls = new Set<string>();
+	// intercepted urls already flagged to the client. tracked separately from
+	// reportedUrls because a url can be surfaced from stdout (reported) before
+	// the shim's file write lands — we must still send the intercept signal
+	// afterwards, even though the url itself is no longer "new".
+	const reportedIntercepted = new Set<string>();
 
 	type Waiter = {
 		resolve: (output: string) => void;
@@ -157,10 +169,7 @@ export function runDaemon(
 	const { stdout, stderr, stdin } = proc;
 
 	function scanForUrls(text: string) {
-		const matches = text.match(URL_RE);
-		if (matches) {
-			for (const url of matches) detectedUrls.add(url);
-		}
+		for (const url of extractUrls(text)) detectedUrls.add(url);
 	}
 
 	function readInterceptedUrls() {
@@ -170,8 +179,13 @@ export function runDaemon(
 			const content = readFileSync(urlsFile, "utf-8");
 			const lines = content.split("\n");
 			for (const line of lines) {
+				// intercepted urls are the exact argv the child asked to open, not
+				// prose — keep them verbatim (a trailing "." etc may be a real
+				// query/state value). trimming only applies to scanned output.
 				const trimmed = line.trim();
-				if (trimmed) detectedUrls.add(trimmed);
+				if (!trimmed) continue;
+				detectedUrls.add(trimmed);
+				interceptedUrls.add(trimmed);
 			}
 		} catch {}
 	}
@@ -243,6 +257,12 @@ export function runDaemon(
 			(u) => !reportedUrls.has(u),
 		);
 		for (const u of newUrls) reportedUrls.add(u);
+		// report each intercepted url once, independently of newUrls — the
+		// intercept signal can arrive after the url was already surfaced.
+		const intercepted = Array.from(interceptedUrls).filter(
+			(u) => !reportedIntercepted.has(u),
+		);
+		for (const u of intercepted) reportedIntercepted.add(u);
 		socket.end(
 			JSON.stringify({
 				ok: true,
@@ -251,6 +271,7 @@ export function runDaemon(
 				exited: processExited,
 				exitCode,
 				...(newUrls.length > 0 ? { urls: newUrls } : {}),
+				...(intercepted.length > 0 ? { intercepted } : {}),
 			}),
 		);
 	}
