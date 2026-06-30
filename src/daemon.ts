@@ -110,6 +110,12 @@ export function runDaemon(
 	// punctuation-trimmed and deduped; the client decides what to do with them
 	const detectedUrls = new Set<string>();
 	const reportedUrls = new Set<string>();
+	// urls the shim actually intercepted (the CLI tried to open them via
+	// PATH `open`/`xdg-open`/$BROWSER, which we captured and suppressed). these
+	// are the ones the client MUST open itself — a CLI that self-opens natively
+	// (railway/supabase) bypasses the shim and never lands here, so the client
+	// knows not to double-open it.
+	const interceptedUrls = new Set<string>();
 
 	type Waiter = {
 		resolve: (output: string) => void;
@@ -172,7 +178,9 @@ export function runDaemon(
 				// prose — keep them verbatim (a trailing "." etc may be a real
 				// query/state value). trimming only applies to scanned output.
 				const trimmed = line.trim();
-				if (trimmed) detectedUrls.add(trimmed);
+				if (!trimmed) continue;
+				detectedUrls.add(trimmed);
+				interceptedUrls.add(trimmed);
 			}
 		} catch {}
 	}
@@ -244,6 +252,7 @@ export function runDaemon(
 			(u) => !reportedUrls.has(u),
 		);
 		for (const u of newUrls) reportedUrls.add(u);
+		const intercepted = newUrls.filter((u) => interceptedUrls.has(u));
 		socket.end(
 			JSON.stringify({
 				ok: true,
@@ -252,6 +261,7 @@ export function runDaemon(
 				exited: processExited,
 				exitCode,
 				...(newUrls.length > 0 ? { urls: newUrls } : {}),
+				...(intercepted.length > 0 ? { intercepted } : {}),
 			}),
 		);
 	}
