@@ -24,7 +24,17 @@ export function stripTrailingPunctuation(url: string): string {
 export function extractUrls(text: string): string[] {
 	const matches = text.replace(ANSI_RE, "").match(URL_RE);
 	if (!matches) return [];
-	return matches.map(stripTrailingPunctuation);
+	const urls: string[] = [];
+	for (const match of matches) {
+		// stripping escapes can glue two adjacent links that were only separated
+		// by color codes (e.g. "…a.com\x1b[0m\x1b[34mhttps://b.com") into one
+		// match — re-split on any embedded scheme so each url comes out whole.
+		for (const part of match.split(/(?=https?:\/\/)/)) {
+			const url = stripTrailingPunctuation(part);
+			if (url) urls.push(url);
+		}
+	}
+	return urls;
 }
 
 export function isAuthUrl(url: string): boolean {

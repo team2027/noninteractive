@@ -77,6 +77,14 @@ test("rejoins a url broken by a mid-string color reset", () => {
 	]);
 });
 
+test("splits two adjacent links separated only by color codes", () => {
+	expect(
+		extractUrls(
+			"\x1b[34mhttps://x.com/a\x1b[0m\x1b[34mhttps://x.com/b\x1b[0m",
+		),
+	).toEqual(["https://x.com/a", "https://x.com/b"]);
+});
+
 test("extracts multiple urls and strips punctuation", () => {
 	expect(
 		extractUrls("a https://x.com/a, then https://x.com/login/device."),
