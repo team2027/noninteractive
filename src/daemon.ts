@@ -169,9 +169,9 @@ export function runDaemon(
 			const lines = content.split("\n");
 			for (const line of lines) {
 				// intercepted urls are the exact argv the child asked to open, not
-			// prose — keep them verbatim (a trailing "." etc may be a real query
-			// /state value). punctuation trimming only applies to scanned output.
-			const trimmed = line.trim();
+				// prose — keep them verbatim (a trailing "." etc may be a real
+				// query/state value). trimming only applies to scanned output.
+				const trimmed = line.trim();
 				if (trimmed) detectedUrls.add(trimmed);
 			}
 		} catch {}
