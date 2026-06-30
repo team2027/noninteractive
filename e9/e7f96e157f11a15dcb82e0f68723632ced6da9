@@ -1,0 +1,53 @@
+src/daemon.ts
+  s_3ad820fcbbea42::t_5d41d168cb230b 113-118
+  s_3ad820fcbbea42::t_acb3dfc10d7c0a 255,264
+  s_3ad820fcbbea42::t_2698d47b1d550a 181
+  s_3ad820fcbbea42::t_fb78d3df533bdb 182-183
+src/client.ts
+  s_3ad820fcbbea42::t_e5fdd93104fdd2 13
+src/urls.ts
+  s_9d6b4043259793::t_317c20c5c82efb 22
+  s_3ad820fcbbea42::t_bc1119eff2bff3 16-20
+  s_3ad820fcbbea42::t_b8d953081c7778 51-56,71-77
+  s_3ad820fcbbea42::t_7a37c61c151240 57-65
+  s_3ad820fcbbea42::t_da3c17879884ee 66-70
+  s_3ad820fcbbea42::t_462a374425abbd 9-12
+  s_3ad820fcbbea42::t_e44febfdb1c799 21
+CLAUDE.md
+  s_3ad820fcbbea42::t_9c7dd8ddc77760 42-43
+  s_3ad820fcbbea42::t_933e91a8aee072 39
+src/urls.test.ts
+  s_3ad820fcbbea42::t_7326fe13343eed 69-76,90-115,139-147
+  s_3ad820fcbbea42::t_15a2c7955ae21c 2,4-9
+  s_3ad820fcbbea42::t_40169b8d321a19 77-89
+  s_3ad820fcbbea42::t_8e08d4e592e688 116-138
+  s_3ad820fcbbea42::t_b8f9936abd4b8e 3
+package.json
+  s_3ad820fcbbea42::t_f8e4d6a55e105c 3
+src/index.ts
+  s_3ad820fcbbea42::t_616a6ac9c5a3a2 3,7,27,29-31,150,152-177,183-197,199,203-205,259-261,266-271,362,428-433,444,470,510,584,611-612,621,633,637,659,663,696,735
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "e9e7f96e157f11a15dcb82e0f68723632ced6da9",
+  "prompts": {},
+  "sessions": {
+    "s_3ad820fcbbea42": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "07097396-d43b-4e1c-b40c-1a1a00bfd6cd",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Aleksey Bykhun <theisease@gmail.com>"
+    },
+    "s_9d6b4043259793": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "acdd700d-845e-4fbc-838c-445edb2f2570",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Aleksey Bykhun <theisease@gmail.com>"
+    }
+  }
+}
