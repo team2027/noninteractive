@@ -16,9 +16,11 @@ const AUTH_URL_RE =
 // tight, high-confidence auth pattern used to decide what to AUTO-OPEN. only
 // real interactive-auth endpoints — deliberately excludes bare "login" so
 // signup/docs/marketing/release pages (auth0 signup, daytona releases nag, doc
-// links) never pop a browser tab during a login flow (issue #10).
+// links) never pop a browser tab during a login flow (issue #10). the broad
+// tokens (device/activate/callback) are anchored to a path-segment boundary so
+// incidental urls like "…/device-management" or "…/activate-plan" don't match.
 const AUTO_OPEN_RE =
-	/authorize|activate|oauth|device|confirm_auth|cli-auth|cli\/login|\/callback|login_code|token-flow|stripecli/i;
+	/authorize|oauth|\/device(?:login)?(?=[/?#]|$)|\/activate(?=[/?#]|$)|confirm_auth|cli-auth|cli\/login|\/callback(?=[/?#]|$)|login_code|token-flow|stripecli/i;
 
 // the url char class doesn't exclude sentence punctuation, so a match can swallow
 // a trailing "." etc — e.g. "…/releases." → a 404. trim it off the end.
@@ -27,22 +29,19 @@ export function stripTrailingPunctuation(url: string): string {
 }
 
 // pull clean urls out of a (possibly ANSI-colored) chunk of terminal output.
-// strips escapes first so a trailing reset (\x1b[0m) or a mid-url color code
-// can't end up inside the match, then trims trailing sentence punctuation.
+// an escape sequence is dropped when it sits mid-url (so a color reset spliced
+// into a link rejoins it) but replaced with a space when a new scheme follows it
+// (so two adjacent colored links don't glue into one). this keeps a real url
+// that embeds a scheme in a query param — e.g. "?redirect_uri=https://app/cb" —
+// intact, since no escape separates the two schemes there. then trims trailing
+// sentence punctuation off each match.
 export function extractUrls(text: string): string[] {
-	const matches = text.replace(ANSI_RE, "").match(URL_RE);
+	const cleaned = text.replace(ANSI_RE, (match, offset: number) =>
+		/^https?:\/\//.test(text.slice(offset + match.length)) ? " " : "",
+	);
+	const matches = cleaned.match(URL_RE);
 	if (!matches) return [];
-	const urls: string[] = [];
-	for (const match of matches) {
-		// stripping escapes can glue two adjacent links that were only separated
-		// by color codes (e.g. "…a.com\x1b[0m\x1b[34mhttps://b.com") into one
-		// match — re-split on any embedded scheme so each url comes out whole.
-		for (const part of match.split(/(?=https?:\/\/)/)) {
-			const url = stripTrailingPunctuation(part);
-			if (url) urls.push(url);
-		}
-	}
-	return urls;
+	return matches.map(stripTrailingPunctuation).filter(Boolean);
 }
 
 export function isAuthUrl(url: string): boolean {

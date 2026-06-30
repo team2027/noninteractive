@@ -99,6 +99,12 @@ test("does not auto-open docs/signup/marketing/release urls", () => {
 	expect(isAutoOpenUrl("https://docs.example.com/getting-started")).toBe(false);
 	// bare /login (a marketing/login landing page) is not high-confidence enough
 	expect(isAutoOpenUrl("https://app.example.com/login")).toBe(false);
+	// broad tokens anchored to a path-segment boundary: incidental compound
+	// paths must not match (issue #10 spurious tab)
+	expect(isAutoOpenUrl("https://docs.example.com/device-management")).toBe(
+		false,
+	);
+	expect(isAutoOpenUrl("https://billing.example.com/activate-plan")).toBe(false);
 });
 
 test("picks the first auth url, skipping junk", () => {
@@ -176,6 +182,18 @@ test("splits two adjacent links separated only by color codes", () => {
 			"\x1b[34mhttps://x.com/a\x1b[0m\x1b[34mhttps://x.com/b\x1b[0m",
 		),
 	).toEqual(["https://x.com/a", "https://x.com/b"]);
+});
+
+test("keeps a url that embeds a scheme in a query param intact", () => {
+	// no escape separates the two schemes, so it must NOT be split — a common
+	// oauth shape with an unencoded redirect_uri
+	expect(
+		extractUrls(
+			"https://auth.acme.com/authorize?redirect_uri=https://app.acme.com/cb&state=x",
+		),
+	).toEqual([
+		"https://auth.acme.com/authorize?redirect_uri=https://app.acme.com/cb&state=x",
+	]);
 });
 
 test("extracts multiple urls and strips punctuation", () => {
