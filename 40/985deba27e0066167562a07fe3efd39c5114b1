@@ -1,0 +1,19 @@
+package.json
+  s_3ad820fcbbea42::t_5d405545bc3f53 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "40985deba27e0066167562a07fe3efd39c5114b1",
+  "prompts": {},
+  "sessions": {
+    "s_3ad820fcbbea42": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "07097396-d43b-4e1c-b40c-1a1a00bfd6cd",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Aleksey Bykhun <theisease@gmail.com>"
+    }
+  }
+}
