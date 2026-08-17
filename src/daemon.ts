@@ -62,7 +62,13 @@ function getPtyBridge(): string {
 			if (statSync(p).isFile()) return p;
 		} catch {}
 	}
-	return candidates[0];
+	// fail loudly with the exact miss — returning a non-existent path here only
+	// yields a bare ENOENT from spawn, which is why the arch mismatch was so hard
+	// to diagnose (see #10).
+	throw new Error(
+		`ptybridge binary not found: looked for "${binaryName}" ` +
+			`(node ${process.platform}/${process.arch}) in:\n  ${candidates.join("\n  ")}`,
+	);
 }
 
 function createInterceptorScripts(name: string) {
@@ -170,7 +176,20 @@ export function runDaemon(
 	}
 
 	const binDir = sessionBinDir(sessionName);
-	const ptyBridge = getPtyBridge();
+	let ptyBridge: string;
+	try {
+		ptyBridge = getPtyBridge();
+	} catch (err) {
+		// persist the descriptive error so a follow-up `read`/`send` surfaces it
+		// (the daemon exits before the socket is up, so `start` will report a
+		// failed start; the file fallback carries the real reason).
+		const msg = `[error: ${(err as Error).message}]`;
+		try {
+			writeFileSync(sessionOutputFile(sessionName), msg);
+		} catch {}
+		process.stderr.write(`${msg}\n`);
+		process.exit(1);
+	}
 	const spawnCwd = process.env.NI_CWD || process.cwd();
 	const proc = spawn(ptyBridge, [executable, ...args], {
 		stdio: ["pipe", "pipe", "pipe"],
