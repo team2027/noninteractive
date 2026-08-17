@@ -27,10 +27,27 @@ interface DaemonMessage {
 	timeout?: number;
 }
 
+// map node's process.arch to Go's GOARCH, which is what the shipped binaries are
+// named with. node reports "x64" for 64-bit intel/amd; Go calls it "amd64", so
+// the two only agree on arm64 — without this map a linux-x64 host (e.g. the eval
+// sandbox) looks for ptybridge-linux-x64 and never finds ptybridge-linux-amd64.
+const GOARCH_BY_NODE_ARCH: Record<string, string> = {
+	x64: "amd64",
+	arm64: "arm64",
+};
+
+// the shipped binary name for a given node platform/arch. exported so a test can
+// assert every native/ file is reachable from the host that needs it.
+export function ptyBridgeBinaryName(
+	nodePlatform: string,
+	nodeArch: string,
+): string {
+	const arch = GOARCH_BY_NODE_ARCH[nodeArch] ?? nodeArch;
+	return `ptybridge-${nodePlatform}-${arch}`;
+}
+
 function getPtyBridge(): string {
-	const platform = process.platform;
-	const arch = process.arch;
-	const binaryName = `ptybridge-${platform}-${arch}`;
+	const binaryName = ptyBridgeBinaryName(process.platform, process.arch);
 
 	const scriptDir = dirname(process.argv[1] || process.execPath);
 	const candidates = [
