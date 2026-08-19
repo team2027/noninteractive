@@ -1,6 +1,34 @@
 {
   "name": "noninteractive",
-  "version": "0.3.40",
+  "version": "0.3.41",
+  "description": "Run interactive CLI commands (login flows, setup wizards, installers) non-interactively — a real-PTY session wrapper built for AI coding agents.",
+  "keywords": [
+    "cli",
+    "pty",
+    "interactive",
+    "non-interactive",
+    "automation",
+    "oauth",
+    "login",
+    "terminal",
+    "tty",
+    "agent",
+    "ai-agent",
+    "claude-code"
+  ],
+  "homepage": "https://github.com/team2027/noninteractive#readme",
+  "bugs": {
+    "url": "https://github.com/team2027/noninteractive/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/team2027/noninteractive.git"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "team2027",
+    "url": "https://github.com/team2027"
+  },
   "type": "module",
   "bin": {
     "noninteractive": "./bin/noninteractive.js"
