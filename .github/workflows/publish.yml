@@ -1,0 +1,77 @@
+name: Publish to npm
+
+# Publishes on a semver tag (v0.3.43, v1.0.0, …) from a clean CI checkout.
+#
+# WHY this exists:
+#   1. Provenance — `npm publish --provenance` + OIDC attaches a VERIFIED badge
+#      tying the package to this repo + commit + workflow. That is the signal a
+#      cautious AI agent asked for (a repo string in package.json is self-
+#      asserted; provenance is attested by npm about us). Requires
+#      `id-token: write`.
+#   2. No more stale ships — 0.3.37 and 0.3.38 shipped an outdated `bin/`
+#      (gitignored, built at pack time) because they were hand-published from a
+#      stale working tree. A clean CI checkout + rebuild + a hard artifact gate
+#      makes that impossible.
+#
+# ONE-TIME npm-side setup (owner, on npmjs.com → the `noninteractive` package →
+# Settings → Trusted Publishers → GitHub Actions):
+#     repository = team2027/noninteractive
+#     workflow   = publish.yml
+# That enables token-less OIDC publishing (no long-lived NPM_TOKEN to leak).
+# Until it's configured the "Publish" step fails auth — that's the missing
+# config, not a workflow bug. (Token fallback: set repo secret NPM_TOKEN to a
+# granular automation token and add `env: NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`
+# to the publish step; provenance still works, but OIDC is preferred.)
+#
+# RELEASE: bump the version, commit, then `git tag vX.Y.Z && git push --tags`.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write # required for provenance + trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Test
+        run: bun test
+
+      - name: Build bin/ fresh from the committed src
+        run: bun run build
+
+      # Hard gate: the built artifact users actually receive must carry the
+      # platform fix. This is the check that would have caught 0.3.37/0.3.38.
+      - name: Verify built artifact is not stale
+        run: |
+          grep -q 'GOARCH_BY_NODE_ARCH' bin/noninteractive.js \
+            || { echo "::error::bin/ is stale — missing arch map, refusing to publish"; exit 1; }
+
+      # npm >= 11.5 is needed for OIDC trusted publishing.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      - run: npm install -g npm@latest
+
+      - name: Verify the tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          test "$TAG" = "$PKG" || { echo "::error::tag v$TAG != package.json $PKG"; exit 1; }
+
+      - name: Publish with provenance
+        run: npm publish --provenance --access public
