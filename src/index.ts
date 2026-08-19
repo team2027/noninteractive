@@ -4,6 +4,7 @@ import { execSync, spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { type DaemonResponse, sendMessage } from "./client";
 import { ensureSessionsDir, sessionOutputFile, socketPath } from "./paths";
+import { needsEnterHint } from "./input";
 import { announcesSelfOpen, isAuthUrl, pickAutoOpenUrl } from "./urls";
 
 const HELP = `noninteractive — run interactive CLI commands non-interactively.
@@ -394,7 +395,7 @@ async function start(
 						`\n[session '${name}' started — the first prompt is shown above. use:]`,
 					);
 					console.log(
-						`  npx noninteractive send ${name} "<text>"      # send and get response (waits by default)`,
+						`  npx noninteractive send ${name} "text\\r"      # type text + Enter — the \\r submits (text alone won't)`,
 					);
 					console.log(
 						`  npx noninteractive read ${name} --wait        # only needed for long waits (e.g. OAuth, npm install)`,
@@ -480,6 +481,7 @@ async function send(
 	timeout: number,
 	noOpen = false,
 ) {
+	const rawArg = text;
 	// empty string "" is a shorthand for pressing Enter
 	if (text === "") text = "\r";
 	// parse C-style escape sequences so agents don't need shell $'...' quoting
@@ -507,6 +509,15 @@ async function send(
 	if (keyHints[upper]) {
 		console.error(
 			`hint: "${text}" was sent as literal text. for the ${upper} key, use "${keyHints[upper]}" instead.`,
+		);
+	}
+	// point-of-use reminder: text is sent literally with no auto-Enter, so a
+	// value typed without a trailing \r just sits at the prompt unsubmitted (the
+	// #1 reverse-engineering cost agents hit). the keyHints branch already covers
+	// bare key-name typos, so don't double-warn there.
+	if (!keyHints[upper] && needsEnterHint(text)) {
+		console.error(
+			`hint: "${rawArg}" was sent literally with no Enter — the target CLI won't act on it until you submit. append \\r to press Enter, e.g. "${rawArg}\\r".`,
 		);
 	}
 	const sock = socketPath(name);
